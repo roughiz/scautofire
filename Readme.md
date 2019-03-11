@@ -11,8 +11,8 @@ The fastest Internet port scanner. It can scan the entire Internet in under 6 mi
 Combined with nmap, we can scan all (tcp/udp) port very quickly.
 
 #### Nota:
-
-We have to install keepnote to open the created report 
+masscan and keepnote must be installed.
+You should open report with KeepNote tool.
 
 # Script argments: 
 

@@ -340,7 +340,7 @@ usage()
     echo "\t -h --help"
     echo "\t --type=l (set by default) / --type=h\t[ Type of scan huge scan all port , and light for commun ports ] "
     echo "\t --name=a_report_name\t[ the name of the report without space ] <Required>"
-    echo "\t --masscan=on (set by default) / --masscan=no\t(scan without usinf masscan) "
+    echo "\t --masscan=on (set by default) / --masscan=no\t(scan without using masscan) "
     echo "\t --interface=tun0\t( the interface to use with masscan, required if we use masscan )"
     echo "\t --path=/path/to/report/destination_directory\t( a directory where the script will create the report) <required>"
     echo "\t --cidr=ip/cidr\t( ip or a cidr like 10.10.10.0/24) <required>"
