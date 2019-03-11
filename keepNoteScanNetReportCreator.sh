@@ -1,5 +1,5 @@
 #!/bin/sh
-# create the keepNote directory functins
+# create the keepNote directory functions
 
 hash_gen(){
   id=""
@@ -282,13 +282,34 @@ cat <<EOF > $mydir/node.xml
 </dict>
 </node>
 EOF
-# type of scan
-if [ "$3" = "l" ]; then
-  sudo nmap  -sV -sS  -T4 -oN $mydir/nmap.txt  $1
+# masscan 
+udp=0
+if [ "$4" = "on" ]; then
+  sudo masscan -p1-65535,U:1-65535 $1 --rate=300 -e $5 > $mydir/masscan.txt
+  for port in $(cat $mydir/masscan.txt | grep -i open  | grep -i tcp |cut  -d " " -f 4 | cut -d "/" -f 1) ; do ports_tcp="$port,$ports_tcp"  ; done
+  ports_tcp=$(echo $ports_tcp | sed 's/.$//'  )
+
+  for port in $(cat $mydir/masscan.txt | grep -i open  | grep -i udp |cut  -d " " -f 4 | cut -d "/" -f 1) ; do ports_udp="$port,$ports_udp"  ; done
+  ports_udp=$(echo $ports_udp | sed 's/.$//'  )
+  #echo "ports scan : $ports_tcp"
+  if [ $(echo $ports_tcp | wc -w)   -ne 0 ]; then
+     sudo  nmap  -sV -sS -p $ports_tcp -T4 -sC  -oN $mydir/nmap.txt  $1
+  fi
+  if [ $(echo $ports_udp | wc -w)   -ne 0 ]; then
+     sudo  nmap  -sV -sS -sU -p $ports_udp -T4 -sC  -oN $mydir/nmap2.txt  $1
+     udp=1
+  fi
 else
-  sudo  nmap  -sV -sS -p- -T4 -sC  -oN $mydir/nmap.txt  $1
+  if [ "$3" = "l" ]; then
+    sudo nmap  -sV -sS  -T4 -oN $mydir/nmap.txt  $1
+  else
+    sudo  nmap  -sV -sS -p- -T4 -sC  -oN $mydir/nmap.txt  $1
+  fi
 fi
 content=$(sed  's/.*/&<br>/'   $mydir/nmap.txt)
+if [ "$udp" -ne 0 ]; then 
+content="$content <br>Udp section : <br>  $(sed  's/.*/&<br>/'   $mydir/nmap2.txt) "
+fi
 cat <<EOF > $mydir/page.html
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml"><body>
@@ -313,44 +334,111 @@ else
 fi
 }
 
-if [ "$#" -ne 4 ]; then
-    echo "Illegal number of parameters, 4 arguments required"
-    echo "Example $0 <l(light scan)/h(huge scan)> <report-name> <path_to> <ip/cidr>"
-    echo "Example : $0 l myreport /path/to/report/destination_directory 10.10.10.0/24" 
+usage()
+{
+    echo "\nHelp :"
+    echo "\t -h --help"
+    echo "\t --type=l (set by default) / --type=h\t[ Type of scan huge scan all port , and light for commun ports ] "
+    echo "\t --name=a_report_name\t[ the name of the report without space ] <Required>"
+    echo "\t --masscan=on (set by default) / --masscan=no\t(scan without usinf masscan) "
+    echo "\t --interface=tun0\t( the interface to use with masscan, required if we use masscan )"
+    echo "\t --path=/path/to/report/destination_directory\t( a directory where the script will create the report) <required>"
+    echo "\t --cidr=ip/cidr\t( ip or a cidr like 10.10.10.0/24) <required>"
+    echo "Examples :\n"
+    echo "Default scan using Masscan:  \n$0 --name=report-name --path=/path/to/report/destination_directory --cidr=ip/cidr\n"
+    echo "Create a report scan with a light scan without Masscan :\n$0 --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
+    echo "Create a report scan with a huge scan without Masscan :\n$0 --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
+
+
+}
+# Default values
+scantype=l
+masscan=on
+interface=""
+required=0
+while [ "$1" != "" ]; do
+    PARAM=`echo $1 | awk -F= '{print $1}'`
+    VALUE=`echo $1 | awk -F= '{print $2}'`
+    case $PARAM in
+        -h | --help)
+            usage
+            exit
+            ;;
+        --type)
+             if [ "$VALUE" = "h" ] || [ "$VALUE" = "l" ] ; then
+                scantype=$VALUE
+             else 
+                echo "ERROR: value \"$VALUE\" for parameter \"$PARAM\" is wrong "
+                usage
+                exit 1	
+             fi
+             ;;
+        --name)
+            name=$VALUE
+            required=$((required+1))
+            ;;
+        --masscan)
+             if [ "$VALUE" = "no" ] || [ "$VALUE" = "on" ]; then
+                masscan=$VALUE
+             else 
+                echo "ERROR: value \"$VALUE\" for parameter \"$PARAM\" is wrong "
+                usage
+                exit 1
+             fi
+             ;;
+        --interface)
+            interface=$VALUE
+            ;;  
+        --path)
+            if [ -d "$VALUE" ]; then
+              rootDir=$VALUE
+              required=$((required+1))
+            else
+              echo "ERROR: the path \"$VALUE\" is not a directory !! "
+              usage
+              exit 1
+            fi
+            ;;
+        --cidr)
+            cidrip=$VALUE
+            required=$((required+1))
+            ;;
+        *)
+            echo "ERROR: unknown parameter \"$PARAM\""
+            usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+# Main
+if [ "$required" -ne 3 ]; then
+   echo "ERROR: parameters '--name' and '--path' and '--cidr' are required "
+   usage
+   exit 1
 else
-    rootDir=$3
-    name=$2
-    cidrip=$4
-    dir=$3/$2
+    if [ "$masscan" = "on" ] && [ "$interface" = "" ]; then
+       echo "ERROR: the parameter '--interface' must be set when '--masscan' is enabled "
+       usage 
+       exit 1
+    fi
+    dir=$rootDir/$name
     scanfile=$dir/scan.txt
     ipfile=$dir/boxes_ips.txt
-    scantype=$1
-
-   if [ "$scantype" = "l" ]  || [ "$scantype" = "h" ] ; then
-    if [ -d "$rootDir" ]; then
-           create_keepNote $name $rootDir && \
-           cp -r template/__NOTEBOOK__ $dir/ &&\
-           sudo nmap --top-ports 100 -oN $scanfile $cidrip 
-           cat $scanfile |  grep -i "Nmap scan" | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' > $ipfile 
-	   for ip in $(cat $ipfile );do
-                 verify_ip $ip
-                 if [ $? -ne 0 ]; then
-                    echo "$ip good"
-                    create_sub_kpn $ip $dir $scantype
-                 else
-                    echo "$ip is not a valid ip"
-                 fi 
-               done      
-          sudo chown -R $(whoami):$(whoami) $dir
-    else
-           echo "Error : directory  $rootDir not exist" 
-	   exit 1
-    fi
-   else
-        echo "Usage : "
-	echo "Example $0 <l(light scan)/h(huge scan)> <report-name> <path_to> <ip/cidr>"
-        echo "Example : $0 l myreport /path/to/report/destination_directory 10.10.10.0/24" 
-        return 1
-   fi
+    create_keepNote $name $rootDir && \
+    cp -r template/__NOTEBOOK__ $dir/ &&\
+    sudo nmap --top-ports 100 -oN $scanfile $cidrip 
+    cat $scanfile |  grep -i "Nmap scan" | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' > $ipfile 
+    for ip in $(cat $ipfile );do
+        verify_ip $ip
+        if [ $? -ne 0 ]; then
+           #echo "$ip good"
+           create_sub_kpn $ip $dir $scantype $masscan $interface
+        else
+           echo "\"$ip\" is not a valid ip"
+        fi 
+    done      
+    sudo chown -R $(whoami):$(whoami) $dir
 fi
 
