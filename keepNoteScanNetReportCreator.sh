@@ -285,7 +285,7 @@ EOF
 # masscan 
 udp=0
 if [ "$4" = "on" ]; then
-  sudo masscan -p1-65535,U:1-65535 $1 --rate=300 -e $5 > $mydir/masscan.txt
+  sudo masscan -p1-65535,U:1-65535 $1 --rate=$6 -e $5 > $mydir/masscan.txt
   for port in $(cat $mydir/masscan.txt | grep -i open  | grep -i tcp |cut  -d " " -f 4 | cut -d "/" -f 1) ; do ports_tcp="$port,$ports_tcp"  ; done
   ports_tcp=$(echo $ports_tcp | sed 's/.$//'  )
 
@@ -342,10 +342,11 @@ usage()
     echo "\t --name=a_report_name\t[ the name of the report without space ] <Required>"
     echo "\t --masscan=on (set by default) / --masscan=no\t(scan without using masscan) "
     echo "\t --interface=tun0\t( the interface to use with masscan, required if we use masscan )"
+    echo "\t --rate=1000\t(by default the rate is set to 150 which is slow but you can increase the speed , with a hight rate )"
     echo "\t --path=/path/to/report/destination_directory\t( a directory where the script will create the report) <required>"
     echo "\t --cidr=ip/cidr\t( ip or a cidr like 10.10.10.0/24) <required>"
     echo "Examples :\n"
-    echo "Default scan using Masscan:  \n$0 --name=report-name --path=/path/to/report/destination_directory --cidr=ip/cidr\n"
+    echo "Default scan using Masscan with a rate of 500:  \n$0 --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=ip/cidr\n"
     echo "Create a report scan with a light scan without Masscan :\n$0 --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
     echo "Create a report scan with a huge scan without Masscan :\n$0 --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
 
@@ -356,6 +357,7 @@ scantype=l
 masscan=on
 interface=""
 required=0
+rate=150
 while [ "$1" != "" ]; do
     PARAM=`echo $1 | awk -F= '{print $1}'`
     VALUE=`echo $1 | awk -F= '{print $2}'`
@@ -388,7 +390,17 @@ while [ "$1" != "" ]; do
              ;;
         --interface)
             interface=$VALUE
-            ;;  
+            ;;
+        --rate)
+            re='^[0-9]+$'
+            if [ "$VALUE" -gt 0 ] ; then
+               rate=$VALUE
+            else
+               echo "ERROR: the value  \"$VALUE\" should be a positive integer only"
+               usage
+               exit 1
+            fi
+            ;;    
         --path)
             if [ -d "$VALUE" ]; then
               rootDir=$VALUE
@@ -434,7 +446,7 @@ else
         verify_ip $ip
         if [ $? -ne 0 ]; then
            #echo "$ip good"
-           create_sub_kpn $ip $dir $scantype $masscan $interface
+           create_sub_kpn $ip $dir $scantype $masscan $interface $rate
         else
            echo "\"$ip\" is not a valid ip"
         fi 
