@@ -17,23 +17,24 @@ You should open report with KeepNote tool.
 # Script argments: 
 
 ```
-	 -h --help
+         -h --help
 	 --type=l (set by default) / --type=h	[ Type of scan huge scan all port , and light for commun ports ] 
 	 --name=a_report_name	[ the name of the report without space ] <Required>
-	 --masscan=on (set by default) / --masscan=no	(scan without usinf masscan) 
+	 --masscan=on (set by default) / --masscan=no	(scan without using masscan) 
 	 --interface=tun0	( the interface to use with masscan, required if we use masscan )
+	 --rate=1000	(by default the rate is set to 150 which is slow but you can increase the speed , with a hight rate )
 	 --path=/path/to/report/destination_directory	( a directory where the script will create the report) <required>
 	 --cidr=ip/cidr	( ip or a cidr like 10.10.10.0/24) <required>
 Examples :
 
-Default scan using Masscan:  
-./keepNoteScanNetReportCreator.sh --name=report-name --path=/path/to/report/destination_directory --cidr=ip/cidr
+Default scan using Masscan with a rate of 500:
+/home/roughiz/MyGit/EnumNeTKeepNoteReportCreator/keepNoteScanNetReportCreator.sh --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=ip/cidr
 
 Create a report scan with a light scan without Masscan :
-./keepNoteScanNetReportCreator.sh --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
+/home/roughiz/MyGit/EnumNeTKeepNoteReportCreator/keepNoteScanNetReportCreator.sh --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
 
 Create a report scan with a huge scan without Masscan :
-./keepNoteScanNetReportCreator.sh --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
+/home/roughiz/MyGit/EnumNeTKeepNoteReportCreator/keepNoteScanNetReportCreator.sh --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
 
 ```
 
