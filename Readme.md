@@ -13,11 +13,17 @@ Combined with nmap, we can scan all (tcp/udp) port very quickly.
 #### Nota:
 masscan and keepnote must be installed.
 You should open report with KeepNote tool.
+To start the script from anywhere you should define the location of the script like :
+```
+export KEEPSCAN="/path/to/EnumNeTKeepNoteReportCreator"
+```
+
 
 # Script argments: 
 
 ```
-         -h --help
+Help :
+	 -h --help
 	 --type=l (set by default) / --type=h	[ Type of scan huge scan all port , and light for commun ports ] 
 	 --name=a_report_name	[ the name of the report without space ] <Required>
 	 --masscan=on (set by default) / --masscan=no	(scan without using masscan) 
@@ -25,10 +31,15 @@ You should open report with KeepNote tool.
 	 --rate=1000	(by default the rate is set to 150 which is slow but you can increase the speed , with a hight rate )
 	 --path=/path/to/report/destination_directory	( a directory where the script will create the report) <required>
 	 --cidr=ip/cidr	( ip or a cidr like 10.10.10.0/24) <required>
+	 --router-ip=the gateway of an interface if masscan can't found it (failed to detect router for interface) 
+	 --ips-list=/path/to/file ( this file contains a list of ips to scan)
 Examples :
 
-Default scan using Masscan with a rate of 500:
+Default scan using Masscan with a rate of 500:  
 /home/roughiz/MyGit/EnumNeTKeepNoteReportCreator/keepNoteScanNetReportCreator.sh --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=ip/cidr
+
+Default scan using Masscan and a list of ips, with the router ip gateway :  
+/home/roughiz/MyGit/EnumNeTKeepNoteReportCreator/keepNoteScanNetReportCreator.sh --name=report-name --path=/path/to/report/destination_directory --ips-list=file --interface=tun0  --router-ip=192.168.55.1 
 
 Create a report scan with a light scan without Masscan :
 /home/roughiz/MyGit/EnumNeTKeepNoteReportCreator/keepNoteScanNetReportCreator.sh --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24

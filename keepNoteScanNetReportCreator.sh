@@ -285,7 +285,11 @@ EOF
 # masscan 
 udp=0
 if [ "$4" = "on" ]; then
-  sudo masscan -p1-65535,U:1-65535 $1 --rate=$6 -e $5 > $mydir/masscan.txt
+  if [ "$7" = "" ];then 
+    sudo masscan -p1-65535,U:1-65535 $1 --rate=$6 -e $5  > $mydir/masscan.txt
+  else
+    sudo masscan -p1-65535,U:1-65535 $1 --rate=$6 -e $5 --router-ip $7 > $mydir/masscan.txt
+  fi
   for port in $(cat $mydir/masscan.txt | grep -i open  | grep -i tcp |cut  -d " " -f 4 | cut -d "/" -f 1) ; do ports_tcp="$port,$ports_tcp"  ; done
   ports_tcp=$(echo $ports_tcp | sed 's/.$//'  )
 
@@ -345,8 +349,11 @@ usage()
     echo "\t --rate=1000\t(by default the rate is set to 150 which is slow but you can increase the speed , with a hight rate )"
     echo "\t --path=/path/to/report/destination_directory\t( a directory where the script will create the report) <required>"
     echo "\t --cidr=ip/cidr\t( ip or a cidr like 10.10.10.0/24) <required>"
+    echo "\t --router-ip=the gateway of an interface if masscan can't found it (failed to detect router for interface) "
+    echo "\t --ips-list=/path/to/file ( this file contains a list of ips to scan)" 
     echo "Examples :\n"
     echo "Default scan using Masscan with a rate of 500:  \n$0 --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=ip/cidr\n"
+    echo "Default scan using Masscan and a list of ips, with the router ip gateway :  \n$0 --name=report-name --path=/path/to/report/destination_directory --ips-list=file --interface=tun0  --router-ip=192.168.55.1 \n"
     echo "Create a report scan with a light scan without Masscan :\n$0 --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
     echo "Create a report scan with a huge scan without Masscan :\n$0 --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
 
@@ -358,6 +365,13 @@ masscan=on
 interface=""
 required=0
 rate=150
+file_ips=""
+router_ip=""
+gks=$(env | grep KEEPSCAN)
+if [ "$gks" = "" ];then
+  KEEPSCAN="."
+fi
+
 while [ "$1" != "" ]; do
     PARAM=`echo $1 | awk -F= '{print $1}'`
     VALUE=`echo $1 | awk -F= '{print $2}'`
@@ -411,9 +425,29 @@ while [ "$1" != "" ]; do
               exit 1
             fi
             ;;
+        --ips-list)
+            if [ -f "$VALUE" ]; then
+              file_ips=$VALUE
+              required=$((required+1))	
+            else
+              echo "ERROR: the path \"$VALUE\" is not a file !! "
+              usage
+              exit 1
+            fi
+            ;;
         --cidr)
             cidrip=$VALUE
             required=$((required+1))
+            ;;
+        --router-ip)
+            verify_ip $VALUE
+            if [ $? -ne 0 ]; then
+               router_ip="$VALUE"
+            else
+              echo "ERROR: the value  \"$VALUE\" is not a valid ip !!"
+              usage
+              exit 1
+            fi
             ;;
         *)
             echo "ERROR: unknown parameter \"$PARAM\""
@@ -426,7 +460,7 @@ done
 
 # Main
 if [ "$required" -ne 3 ]; then
-   echo "ERROR: parameters '--name' and '--path' and '--cidr' are required "
+   echo "ERROR: parameters '--name' and '--path' and ('--cidr' or '--ips-list') are required"
    usage
    exit 1
 else
@@ -439,14 +473,17 @@ else
     scanfile=$dir/scan.txt
     ipfile=$dir/boxes_ips.txt
     create_keepNote $name $rootDir && \
-    cp -r template/__NOTEBOOK__ $dir/ &&\
-    sudo nmap --top-ports 100 -oN $scanfile $cidrip 
-    cat $scanfile |  grep -i "Nmap scan" | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' > $ipfile 
+    cp -r $KEEPSCAN/template/__NOTEBOOK__ $dir/ &&\
+    if [ "$file_ips" != "" ]; then
+        cat $file_ips > $ipfile
+    else
+        sudo nmap --top-ports 100 -oN $scanfile $cidrip 
+        cat $scanfile |  grep -i "Nmap scan" | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' > $ipfile 
+    fi
     for ip in $(cat $ipfile );do
         verify_ip $ip
         if [ $? -ne 0 ]; then
-           #echo "$ip good"
-           create_sub_kpn $ip $dir $scantype $masscan $interface $rate
+           create_sub_kpn $ip $dir $scantype $masscan $interface $rate $router_ip
         else
            echo "\"$ip\" is not a valid ip"
         fi 
