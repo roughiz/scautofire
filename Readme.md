@@ -49,6 +49,14 @@ Create a report scan with a huge scan without Masscan :
 
 ```
 
+### Create a page for a keepNote report 
+We can also create just a page for a keepNote report, an example here to create a page for the Hack the box Inception machine :
+
+```
+create_SemiNoteFromIpWithMasscan.sh 10.10.10.67  /path/to/a/keepnote/report Inception  tun0
+```
+
+
 
 
 
