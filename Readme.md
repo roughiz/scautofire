@@ -5,6 +5,7 @@ the script make a discovery scan of a network, scan all ips and create a note ab
 
 Create a keepNote report scan of a network from cidr/ip giving in the parameters and create a note for each ip and also make a nmap scan and write all information. The idea is to simplify all steps of scanning and writing info, and also to have a great presentation and organisation of our report.
 
+![report example](https://github.com/roughiz/EnumNeTKeepNoteReportCreator/blob/master/example.png)
 #### Masscan 
 
 The fastest Internet port scanner. It can scan the entire Internet in under 6 minutes, transmitting 10 million packets per second.
