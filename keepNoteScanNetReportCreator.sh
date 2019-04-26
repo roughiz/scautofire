@@ -510,7 +510,7 @@ else
         fi 
     done 
    # If user want to let created report writable by a local user 
-   echo -e "${RED}If you want to let the created report writable by local user, tape :"
-   echo -e "${GREEN}sudo chown -R \$(whoami):\$(whoami) $dir"
+   echo  "${RED}If you want to let the created report writable by local user, tape :"
+   echo  "${GREEN}sudo chown -R \$(whoami):\$(whoami) $dir"
 fi
 

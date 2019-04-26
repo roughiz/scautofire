@@ -16,7 +16,7 @@ masscan and keepnote must be installed.
 You should open report with KeepNote tool.
 To start the script from anywhere you should define the location of the script like :
 ```
-export KEEPSCAN="/path/to/EnumNeTKeepNoteReportCreator"
+sudo export KEEPSCAN="/path/to/EnumNeTKeepNoteReportCreator"
 ```
 ### Install it in global mode
 To intsall the script in global mode, use the script like :
@@ -42,16 +42,16 @@ Help :
 Examples :
 
 Default scan using Masscan with a rate of 500:  
-/home/roughiz/MyGit/EnumNeTKeepNoteReportCreator/keepNoteScanNetReportCreator.sh --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=ip/cidr
+sudo keepNoteScanNetReportCreator.sh --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=ip/cidr
 
 Default scan using Masscan and a list of ips, with the router ip gateway :  
-/home/roughiz/MyGit/EnumNeTKeepNoteReportCreator/keepNoteScanNetReportCreator.sh --name=report-name --path=/path/to/report/destination_directory --ips-list=file --interface=tun0  --router-ip=192.168.55.1 
+sudo keepNoteScanNetReportCreator.sh --name=report-name --path=/path/to/report/destination_directory --ips-list=file --interface=tun0  --router-ip=192.168.55.1 
 
 Create a report scan with a light scan without Masscan :
-/home/roughiz/MyGit/EnumNeTKeepNoteReportCreator/keepNoteScanNetReportCreator.sh --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
+sudo keepNoteScanNetReportCreator.sh --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
 
 Create a report scan with a huge scan without Masscan :
-/home/roughiz/MyGit/EnumNeTKeepNoteReportCreator/keepNoteScanNetReportCreator.sh --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
+sudo keepNoteScanNetReportCreator.sh --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
 
 ```
 
