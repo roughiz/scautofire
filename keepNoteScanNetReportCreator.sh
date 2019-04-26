@@ -286,10 +286,13 @@ EOF
 udp=0
 if [ "$4" = "on" ]; then
   if [ "$7" = "" ];then 
-    sudo masscan -p1-65535,U:1-65535 $1 --rate=$6 -e $5  > $mydir/masscan.txt
+     masscan -p1-65535,U:1-65535 $1 --rate=$6 -e $5  > $mydir/masscan.txt
   else
-    sudo masscan -p1-65535,U:1-65535 $1 --rate=$6 -e $5 --router-ip $7 > $mydir/masscan.txt
+     masscan -p1-65535,U:1-65535 $1 --rate=$6 -e $5 --router-ip $7 > $mydir/masscan.txt
   fi
+  # Initializing variables
+  ports_tcp=""
+  ports_udp=""
   for port in $(cat $mydir/masscan.txt | grep -i open  | grep -i tcp |cut  -d " " -f 4 | cut -d "/" -f 1) ; do ports_tcp="$port,$ports_tcp"  ; done
   ports_tcp=$(echo $ports_tcp | sed 's/.$//'  )
 
@@ -297,17 +300,17 @@ if [ "$4" = "on" ]; then
   ports_udp=$(echo $ports_udp | sed 's/.$//'  )
   #echo "ports scan : $ports_tcp"
   if [ $(echo $ports_tcp | wc -w)   -ne 0 ]; then
-     sudo  nmap  -sV -sS -p $ports_tcp -T4 -sC  -oN $mydir/nmap.txt  $1
+     nmap  -sV -sS -p $ports_tcp -T4 -sC  -oN $mydir/nmap.txt  $1
   fi
   if [ $(echo $ports_udp | wc -w)   -ne 0 ]; then
-     sudo  nmap  -sV -sS -sU -p $ports_udp -T4 -sC  -oN $mydir/nmap2.txt  $1
+     nmap  -sV -sS -sU -p $ports_udp -T4 -sC  -oN $mydir/nmap2.txt  $1
      udp=1
   fi
 else
   if [ "$3" = "l" ]; then
-    sudo nmap  -sV -sS  -T4 -oN $mydir/nmap.txt  $1
+    nmap  -sV -sS  -T4 -oN $mydir/nmap.txt  $1
   else
-    sudo  nmap  -sV -sS -p- -T4 -sC  -oN $mydir/nmap.txt  $1
+    nmap  -sV -sS -p- -T4 -sC  -oN $mydir/nmap.txt  $1
   fi
 fi
 content=$(sed  's/.*/&<br>/'   $mydir/nmap.txt)
@@ -359,7 +362,16 @@ usage()
 
 
 }
+
+# Main 
+#Verify if script run as root
+if [ $(id -u)  -ne 0 ]; then 
+   echo "This script must be run as root, use sudo "$0" instead" 1>&2
+   exit 1
+fi
 # Default values
+GREEN='\033[0;32m'
+RED='\033[0;31m'
 scantype=l
 masscan=on
 interface=""
@@ -369,7 +381,16 @@ file_ips=""
 router_ip=""
 gks=$(env | grep KEEPSCAN)
 if [ "$gks" = "" ];then
-  KEEPSCAN="."
+  if [ -d  "/usr/share/KeepScan/template" ]; then
+       KEEPSCAN="/usr/share/KeepScan"
+  else
+    if [ -d "./template" ]; then 
+      KEEPSCAN="."
+    else
+      print "You should be in the KeepScan directory, or install it globally !!"
+      exit 1 
+    fi
+  fi   
 fi
 
 while [ "$1" != "" ]; do
@@ -458,7 +479,7 @@ while [ "$1" != "" ]; do
     shift
 done
 
-# Main
+# Verify required params
 if [ "$required" -ne 3 ]; then
    echo "ERROR: parameters '--name' and '--path' and ('--cidr' or '--ips-list') are required"
    usage
@@ -477,7 +498,7 @@ else
     if [ "$file_ips" != "" ]; then
         cat $file_ips > $ipfile
     else
-        sudo nmap --top-ports 100 -oN $scanfile $cidrip 
+        nmap --top-ports 100 -oN $scanfile $cidrip 
         cat $scanfile |  grep -i "Nmap scan" | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' > $ipfile 
     fi
     for ip in $(cat $ipfile );do
@@ -487,7 +508,9 @@ else
         else
            echo "\"$ip\" is not a valid ip"
         fi 
-    done      
-    sudo chown -R $(whoami):$(whoami) $dir
+    done 
+   # If user want to let created report writable by a local user 
+   echo -e "${RED}If you want to let the created report writable by local user, tape :"
+   echo -e "${GREEN}sudo chown -R \$(whoami):\$(whoami) $dir"
 fi
 

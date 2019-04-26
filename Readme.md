@@ -18,6 +18,11 @@ To start the script from anywhere you should define the location of the script l
 ```
 export KEEPSCAN="/path/to/EnumNeTKeepNoteReportCreator"
 ```
+### Install it in global mode
+To intsall the script in global mode, use the script like :
+```
+$ sudo ./install_global.sh
+```
 
 
 # Script argments: 
