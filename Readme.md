@@ -42,16 +42,16 @@ Help :
 Examples :
 
 Default scan using Masscan with a rate of 500:  
-sudo keepNoteScanNetReportCreator.sh --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=ip/cidr
+sudo scautofire --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=ip/cidr
 
 Default scan using Masscan and a list of ips, with the router ip gateway :  
-sudo keepNoteScanNetReportCreator.sh --name=report-name --path=/path/to/report/destination_directory --ips-list=file --interface=tun0  --router-ip=192.168.55.1 
+sudo scautofire --name=report-name --path=/path/to/report/destination_directory --ips-list=file --interface=tun0  --router-ip=192.168.55.1 
 
 Create a report scan with a light scan without Masscan :
-sudo keepNoteScanNetReportCreator.sh --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
+sudo scautofire --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
 
 Create a report scan with a huge scan without Masscan :
-sudo keepNoteScanNetReportCreator.sh --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
+sudo scautofire --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
 
 ```
 

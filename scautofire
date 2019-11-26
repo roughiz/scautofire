@@ -26,7 +26,7 @@ create_keepNote(){
 # create directory
 dir=$2/$1
 mkdir $dir
-#creade node 
+#create node 
 cat <<EOF > $dir/node.xml
 <?xml version="1.0" encoding="UTF-8"?>
 <node>
@@ -343,32 +343,42 @@ fi
 
 usage()
 {
-    echo "\nHelp :"
-    echo "\t -h --help"
-    echo "\t --type=l (set by default) / --type=h\t[ Type of scan huge scan all port , and light for commun ports ] "
-    echo "\t --name=a_report_name\t[ the name of the report without space ] <Required>"
-    echo "\t --masscan=on (set by default) / --masscan=no\t(scan without using masscan) "
-    echo "\t --interface=tun0\t( the interface to use with masscan, required if we use masscan )"
-    echo "\t --rate=1000\t(by default the rate is set to 150 which is slow but you can increase the speed , with a hight rate )"
-    echo "\t --path=/path/to/report/destination_directory\t( a directory where the script will create the report) <required>"
-    echo "\t --cidr=ip/cidr\t( ip or a cidr like 10.10.10.0/24) <required>"
-    echo "\t --router-ip=the gateway of an interface if masscan can't found it (failed to detect router for interface) "
-    echo "\t --ips-list=/path/to/file ( this file contains a list of ips to scan)" 
-    echo "Examples :\n"
-    echo "Default scan using Masscan with a rate of 500:  \n$0 --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=ip/cidr\n"
-    echo "Default scan using Masscan and a list of ips, with the router ip gateway :  \n$0 --name=report-name --path=/path/to/report/destination_directory --ips-list=file --interface=tun0  --router-ip=192.168.55.1 \n"
-    echo "Create a report scan with a light scan without Masscan :\n$0 --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
-    echo "Create a report scan with a huge scan without Masscan :\n$0 --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
-
+  if [ "$1" = "addto" ] ; then
+     echo "help for addto command"
+  elif [ "$1" = "new" ] ; then
+     echo "help for new command"
+  else
+       
+     echo "\nHelp :"
+     echo "\t -h --help"
+     echo "\t --type=l (set by default) / --type=h\t[ Type of scan huge scan all port , and light for commun ports ] "
+     echo "\t --name=a_report_name\t[ the name of the report without space ] <Required>"
+     echo "\t --masscan=on (set by default) / --masscan=no\t(scan without using masscan) "
+     echo "\t --interface=tun0\t( the interface to use with masscan, required if we use masscan )"
+     echo "\t --rate=1000\t(by default the rate is set to 150 which is slow but you can increase the speed , with a hight rate )"
+     echo "\t --path=/path/to/report/destination_directory\t( a directory where the script will create the report) <required>"
+     echo "\t --cidr=ip/cidr\t( ip or a cidr like 10.10.10.0/24) <required>"
+     echo "\t --router-ip=the gateway of an interface if masscan can't found it (failed to detect router for interface) "
+     echo "\t --ips-list=/path/to/file ( this file contains a list of ips to scan)" 
+     echo "Examples :\n"
+     echo "Default scan using Masscan with a rate of 500:  \n$0 --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=ip/cidr\n"
+     echo "Default scan using Masscan and a list of ips, with the router ip gateway :  \n$0 --name=report-name --path=/path/to/report/destination_directory --ips-list=file --interface=tun0  --router-ip=192.168.55.1 \n"
+     echo "Create a report scan with a light scan without Masscan :\n$0 --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
+     echo "Create a report scan with a huge scan without Masscan :\n$0 --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
+  fi
 
 }
 
 # Main 
-#Verify if script run as root
-if [ $(id -u)  -ne 0 ]; then 
-   echo "This script must be run as root, use sudo "$0" instead" 1>&2
-   exit 1
-fi
+# verify the command 
+if [ "$1" = "addto" ] || [ "$1" = "new" ] ; then
+     cmd="$1"
+else
+     usage
+     exit
+fi 
+shift
+
 # Default values
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -379,6 +389,8 @@ required=0
 rate=150
 file_ips=""
 router_ip=""
+addto=""
+newrep=""
 gks=$(env | grep KEEPSCAN)
 if [ "$gks" = "" ];then
   if [ -d  "/usr/share/KeepScan/template" ]; then
@@ -393,12 +405,12 @@ if [ "$gks" = "" ];then
   fi   
 fi
 
-while [ "$1" != "" ]; do
+while [ "$1" != "" ]; do    
     PARAM=`echo $1 | awk -F= '{print $1}'`
     VALUE=`echo $1 | awk -F= '{print $2}'`
     case $PARAM in
-        -h | --help)
-            usage
+        -h | --help | help)
+            usage $cmd
             exit
             ;;
         --type)
@@ -479,6 +491,12 @@ while [ "$1" != "" ]; do
     shift
 done
 
+#Verify if script run as root
+if [ $(id -u)  -ne 0 ]; then 
+        echo "This script must be run as root, use sudo "$0" instead" 1>&2
+        exit 1
+fi
+
 # Verify required params
 if [ "$required" -ne 3 ]; then
    echo "ERROR: parameters '--name' and '--path' and ('--cidr' or '--ips-list') are required"
@@ -490,11 +508,16 @@ else
        usage 
        exit 1
     fi
+    #*******************
     dir=$rootDir/$name
     scanfile=$dir/scan.txt
     ipfile=$dir/boxes_ips.txt
+    #****************************
     create_keepNote $name $rootDir && \
     cp -r $KEEPSCAN/template/__NOTEBOOK__ $dir/ &&\
+
+
+
     if [ "$file_ips" != "" ]; then
         cat $file_ips > $ipfile
     else
