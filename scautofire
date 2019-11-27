@@ -327,6 +327,41 @@ $content
 EOF
 }
 
+verify_cidr_param(){
+if expr "$1" : '.*:.*' >/dev/null; then
+   if [ "$(echo "$1" | cut -d: -f2)" != "" ]; then
+     verify_ip $(echo "$1" | cut -d: -f1)
+     if [ $? -eq 0 ]; then
+        echo "${RED}ERROR: parameter \"--cidr=$1\" is not correct. Ip part is wrong. \n${YELLOW}Right format: ip:MachineName${NC}\n"
+        exit 2
+     else
+      return 0
+     fi
+   else
+     echo "${RED}ERROR: parameter \"--cidr=$1\" is not correct. You should define a machine name like: ip:MachineName${NC}\n"
+     exit 2
+   fi 
+elif expr "$1" : '.*/.*' >/dev/null; then
+   cidre=$(echo "$1" | cut -d"/" -f2)
+   if [ "$cidre" != "" ] && [ $cidre -ge 1 -a $cidre -le 32 ]; then
+     verify_ip  $(echo "$1" | cut -d"/" -f1)
+     if [ $? -eq 0 ]; then
+        echo "${RED}ERROR: parameter \"--cidr=$1\" is not correct. Ip part is wrong. \n${YELLOW}Right format: ip/cidr${NC}\n"
+        exit 2     
+     else
+      return 0
+     fi 
+   else
+       echo "${RED}ERROR: parameter \"--cidr=$1\" is not correct. '$cidre' should be an integer: 1<= cidr <=32 \n${YELLOW}Right format: ip/cidr${NC}\n" 
+       exit 2
+   fi   
+fi
+verify_ip  $1
+if [ $? -eq 0 ]; then
+   echo "${RED}ERROR: parameter \"--cidr=$1\" is not correct. Try a valid ip${NC}\n" 
+   exit 2    
+fi
+}
 
 verify_ip(){
 if expr "$1" : '[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$' >/dev/null; then
@@ -341,32 +376,83 @@ else
 fi
 }
 
+verify_net_interface(){
+if [ "$(ifconfig | grep $1 | cut -d: -f 1)" != "$1" ]; then
+   echo "${RED}ERROR: parameter \"--interface=$1\" is not correct. Interface '$1' not found ${NC}\n" 
+   exit 2
+fi   
+}
+
+# color define
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
 usage()
 {
   if [ "$1" = "addto" ] ; then
-     echo "help for addto command"
+     echo "Add a scan into a report already exists mode"
+     echo "${GREEN}\nUsage:${NC}"
+     echo "\t $0  addto [flags]"
+     echo "\n${GREEN}Flags:${NC}"
+     echo "\t -h, --help                   help for addto"
+     echo "\t     --type=string            l|h  ['h' for huge scan(all ports) and 'l' for light scan(for commun ports)]           (light by default)"
+     
+     echo "\t     --masscan=string         on|no ['on' to enable masscan and 'no' to disable masscan]                             (enable by default)"
+     echo "\t     --interface=string       The network interface to use with masscan, required if masscan is enabled"
+     echo "\t     --rate=int               The speed of masscan, 150<value<1000                                                   (set to 150 by default)"
+     echo "\t     --path=string            Path to a $0 report where the scan will be added                             <required>"
+     echo "\t     --cidr=ip[:name]|cidr    ip or a cidr like 10.10.10.0/24, if name used it will be shown instead of the ip"
+     echo "\t     --router-ip=ip           The gateway of the network interface if masscan can't found "
+     echo "\t                                      it(failed to detect router for interface)"
+     echo "\t     --ips-list=string        Path to a file which contains a list of ips to scan, you can define the name to show"
+     echo "\t                                      in the report instead of the ip. Using space for the separation"
+     echo "\n${GREEN}Examples :${NC}\n"
+     echo "Default scan using Masscan with a rate of 500:  \n\t$0 addto --path=/path/to/exists/report/directory --rate=500 --interface=tun0  --cidr=10.10.10.0/16\n"
+     echo "Default scan using Masscan with a rate of 500, scan one ip and define the name to show instead of ip:  \n\t$0 addto  --path=/path/to/exists/report/directory --rate=500 --interface=tun0  --cidr=10.10.10.12:Box12\n"
+     echo "Default scan using Masscan and a list of ips, with the router ip gateway :  \n$0 addto  --path=/path/to/exists/report/directory --ips-list=file --interface=tun0  --router-ip=192.168.55.1 \n"
+     echo "Create a report scan with a light scan without Masscan :\n$0 addto --masscan=no  --path=/path/to/exists/report/directory --cidr=10.10.10.14\n"
+     echo "Create a report scan with a huge scan without Masscan :\n$0 addto --type=h  --masscan=no  --path=/path/to/exists/report/directory --cidr=10.10.10.0/24\n"
   elif [ "$1" = "new" ] ; then
-     echo "help for new command"
+     echo "Create a new report scan mode"
+     echo "${GREEN}\nUsage:${NC}"
+     echo "\t $0  new [flags]"
+     echo "\n${GREEN}Flags:${NC}"
+     echo "\t -h, --help                   help for new"
+     echo "\t     --type=string            l|h  ['h' for huge scan(all ports) and 'l' for light scan(for commun ports)]           (light by default)"
+     
+     echo "\t     --masscan=string         on|no ['on' to enable masscan and 'no' to disable masscan]                             (enable by default)"
+     echo "\t     --interface=string       The network interface to use with masscan, required if masscan is enabled"
+     echo "\t     --rate=int               The speed of masscan, 150<value<1000                                                   (set to 150 by default)"
+     echo "\t     --path=string            Path to a directory where the $0 will create the new report                  <required>"
+     echo "\t     --name=string            The name of the report without space                                                   <Required>"
+     echo "\t     --cidr=ip[:name]|cidr    ip or a cidr like 10.10.10.0/24, if name used it will be shown instead of the ip"
+     echo "\t     --router-ip=ip           The gateway of the network interface if masscan can't found "
+     echo "\t                                      it(failed to detect router for interface)"
+     echo "\t     --ips-list=string        Path to a file which contains a list of ips to scan, you can define the name to show"
+     echo "\t                                      in the report instead of the ip. Using space for the separation"
+     echo  "\n${GREEN}Examples :${NC}\n"
+     echo "Default scan using Masscan with a rate of 500:  \n\t$0 new --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=10.10.10.0/16\n"
+     echo "Default scan using Masscan with a rate of 500, scan one ip and define the name to show instead of ip:  \n\t$0 new --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=10.10.10.12:Box12\n"
+     echo "Default scan using Masscan and a list of ips, with the router ip gateway :  \n$0 new --name=report-name --path=/path/to/report/destination_directory --ips-list=file --interface=tun0  --router-ip=192.168.55.1 \n"
+     echo "Create a report scan with a light scan without Masscan :\n$0 new --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.14\n"
+     echo "Create a report scan with a huge scan without Masscan :\n$0 new --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
   else
-       
-     echo "\nHelp :"
-     echo "\t -h --help"
-     echo "\t --type=l (set by default) / --type=h\t[ Type of scan huge scan all port , and light for commun ports ] "
-     echo "\t --name=a_report_name\t[ the name of the report without space ] <Required>"
-     echo "\t --masscan=on (set by default) / --masscan=no\t(scan without using masscan) "
-     echo "\t --interface=tun0\t( the interface to use with masscan, required if we use masscan )"
-     echo "\t --rate=1000\t(by default the rate is set to 150 which is slow but you can increase the speed , with a hight rate )"
-     echo "\t --path=/path/to/report/destination_directory\t( a directory where the script will create the report) <required>"
-     echo "\t --cidr=ip/cidr\t( ip or a cidr like 10.10.10.0/24) <required>"
-     echo "\t --router-ip=the gateway of an interface if masscan can't found it (failed to detect router for interface) "
-     echo "\t --ips-list=/path/to/file ( this file contains a list of ips to scan)" 
-     echo "Examples :\n"
-     echo "Default scan using Masscan with a rate of 500:  \n$0 --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=ip/cidr\n"
-     echo "Default scan using Masscan and a list of ips, with the router ip gateway :  \n$0 --name=report-name --path=/path/to/report/destination_directory --ips-list=file --interface=tun0  --router-ip=192.168.55.1 \n"
-     echo "Create a report scan with a light scan without Masscan :\n$0 --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
-     echo "Create a report scan with a huge scan without Masscan :\n$0 --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
+     echo "${GREEN}\nUsage:${NC}"
+     echo "\t $0  [command]"
+     echo "${GREEN}Available Commands:${NC}"
+     echo "\t ${YELLOW}new${NC}                     Create a new report scan"
+     echo "\t ${YELLOW}addto${NC}                   Add a scan into a report already exists"
+     echo "\t ${YELLOW}help${NC}                    Help about any command"
+     echo "\n${GREEN}Flags:${NC}"
+     echo "\t -h, --help                   help for $0"
+     echo "\t     --type=string            l|h  ['h' for huge scan(all ports) and 'l' for light scan(for commun ports)]           (light by default)"
+     echo "\t     --masscan=string         on|no ['on' to enable masscan and 'no' to disable masscan]                             (enable by default)"
+     echo "\t     --interface=string       The network interface to use with masscan, required if masscan is enabled"
+     echo "\t     --rate=int               The speed of masscan, 150<value<1000                                                   (set to 150 by default)"
+     echo "\nUse '$0 [command] --help' for more information about a command."
   fi
-
 }
 
 # Main 
@@ -374,20 +460,20 @@ usage()
 if [ "$1" = "addto" ] || [ "$1" = "new" ] ; then
      cmd="$1"
 else
+     echo "${RED}ERROR: '$1'command does not exists${NC}"
      usage
      exit
 fi 
 shift
 
 # Default values
-GREEN='\033[0;32m'
-RED='\033[0;31m'
 scantype=l
 masscan=on
 interface=""
 required=0
 rate=150
 file_ips=""
+cidrip=""
 router_ip=""
 addto=""
 newrep=""
@@ -417,8 +503,8 @@ while [ "$1" != "" ]; do
              if [ "$VALUE" = "h" ] || [ "$VALUE" = "l" ] ; then
                 scantype=$VALUE
              else 
-                echo "ERROR: value \"$VALUE\" for parameter \"$PARAM\" is wrong "
-                usage
+                echo "${RED}ERROR: value \"$VALUE\" for parameter \"$PARAM\" is wrong${NC}\n"
+                usage $cmd
                 exit 1	
              fi
              ;;
@@ -430,8 +516,8 @@ while [ "$1" != "" ]; do
              if [ "$VALUE" = "no" ] || [ "$VALUE" = "on" ]; then
                 masscan=$VALUE
              else 
-                echo "ERROR: value \"$VALUE\" for parameter \"$PARAM\" is wrong "
-                usage
+                echo "${RED}ERROR: value \"$VALUE\" for parameter \"$PARAM\" is wrong${NC}\n"
+                usage $cmd
                 exit 1
              fi
              ;;
@@ -443,8 +529,8 @@ while [ "$1" != "" ]; do
             if [ "$VALUE" -gt 0 ] ; then
                rate=$VALUE
             else
-               echo "ERROR: the value  \"$VALUE\" should be a positive integer only"
-               usage
+               echo "${RED}ERROR: the value  \"$VALUE\" should be a positive integer only${NC}\n"
+               usage $cmd
                exit 1
             fi
             ;;    
@@ -453,8 +539,8 @@ while [ "$1" != "" ]; do
               rootDir=$VALUE
               required=$((required+1))
             else
-              echo "ERROR: the path \"$VALUE\" is not a directory !! "
-              usage
+              echo "${RED}ERROR: the path \"$VALUE\" is not a directory !!${NC}\n"
+              usage $cmd
               exit 1
             fi
             ;;
@@ -463,8 +549,8 @@ while [ "$1" != "" ]; do
               file_ips=$VALUE
               required=$((required+1))	
             else
-              echo "ERROR: the path \"$VALUE\" is not a file !! "
-              usage
+              echo "${RED}ERROR: cannot access \"$VALUE\" no such file !!${NC}\n"
+              usage $cmd
               exit 1
             fi
             ;;
@@ -477,63 +563,81 @@ while [ "$1" != "" ]; do
             if [ $? -ne 0 ]; then
                router_ip="$VALUE"
             else
-              echo "ERROR: the value  \"$VALUE\" is not a valid ip !!"
-              usage
+              echo "${RED}ERROR: the value  \"$VALUE\" is not a valid ip !!${NC}\n"
+              usage $cmd
               exit 1
             fi
             ;;
         *)
-            echo "ERROR: unknown parameter \"$PARAM\""
-            usage
+            echo "${RED}ERROR: unknown parameter \"$PARAM\"${NC}\n"
+            usage $cmd
             exit 1
             ;;
     esac
     shift
 done
 
+# Verify required params
+if [ ! -z $cidrip ] && [ ! -z $file_ips ]; then
+   echo "${RED}ERROR: Only use '--cidr' or '--ips-list'${NC}\n"
+   usage $cmd
+elif [ "$required" -ne 3 ] && [ "$cmd" = "new" ]; then
+   echo "${RED}ERROR: parameters '--name' and '--path' and ('--cidr' or '--ips-list') are required${NC}\n"
+   usage $cmd
+   exit 1
+elif [ "$required" -ne 2 ] && [ "$cmd" = "addto" ]; then
+   echo "${RED}ERROR: parameters '--path' and ('--cidr' or '--ips-list') are required${NC}\n"
+   usage $cmd
+   exit 1
+elif [ "$masscan" = "on" ] && [ "$interface" = "" ]; then
+       echo "${RED}ERROR: the parameter '--interface' must be set when '--masscan' is enabled${NC}\n"
+       usage $cmd
+       exit 1
+fi
+# verify --cidr and --interface
+if [ ! -z $cidrip ]; then 
+  verify_cidr_param $cidrip
+fi
+if [ "$masscan" = "on" ]; then  
+  verify_net_interface $interface
+fi
 #Verify if script run as root
 if [ $(id -u)  -ne 0 ]; then 
-        echo "This script must be run as root, use sudo "$0" instead" 1>&2
+        echo "${YELLOW}This script must be run as root, use sudo "$0" instead\n" 1>&2
         exit 1
 fi
-
-# Verify required params
-if [ "$required" -ne 3 ]; then
-   echo "ERROR: parameters '--name' and '--path' and ('--cidr' or '--ips-list') are required"
-   usage
-   exit 1
-else
-    if [ "$masscan" = "on" ] && [ "$interface" = "" ]; then
-       echo "ERROR: the parameter '--interface' must be set when '--masscan' is enabled "
-       usage 
-       exit 1
-    fi
+exit 1
     #*******************
-    dir=$rootDir/$name
-    scanfile=$dir/scan.txt
-    ipfile=$dir/boxes_ips.txt
-    #****************************
-    create_keepNote $name $rootDir && \
-    cp -r $KEEPSCAN/template/__NOTEBOOK__ $dir/ &&\
+dir=$rootDir/$name
+scanfile=$dir/scan.txt
+ipfile=$dir/boxes_ips.txt
+#****************************
+create_keepNote $name $rootDir && \
+cp -r $KEEPSCAN/template/__NOTEBOOK__ $dir/ &&\
 
-
-
-    if [ "$file_ips" != "" ]; then
-        cat $file_ips > $ipfile
+if [ "$file_ips" != "" ]; then
+   cat $file_ips > $ipfile
+else
+   nmap --top-ports 100 -oN $scanfile $cidrip 
+   cat $scanfile |  grep -i "Nmap scan" | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' > $ipfile 
+fi
+num_ips=0
+for ip in $(cat $ipfile );do
+    verify_ip $ip
+    if [ $? -ne 0 ]; then
+       num_ips=$((num_ips+1))
+       create_sub_kpn $ip $dir $scantype $masscan $interface $rate $router_ip
     else
-        nmap --top-ports 100 -oN $scanfile $cidrip 
-        cat $scanfile |  grep -i "Nmap scan" | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' > $ipfile 
-    fi
-    for ip in $(cat $ipfile );do
-        verify_ip $ip
-        if [ $? -ne 0 ]; then
-           create_sub_kpn $ip $dir $scantype $masscan $interface $rate $router_ip
-        else
-           echo "\"$ip\" is not a valid ip"
-        fi 
-    done 
+       echo "${RED}\"$ip\" is not a valid ip${NC}"
+    fi 
+done 
+   
+if [ $num_ips -gt 0 ]; then   
+   echo "${GREEN} $0 successfully scaned $num_ips ip(s)"
    # If user want to let created report writable by a local user 
-   echo "${RED}If you want to let this report writable by the local user, tape :"
+   echo "${YELLOW}If you want to let this report writable by the local user, tape :"
    echo "${GREEN}sudo chown -R \$(whoami):\$(whoami) $dir"
+else
+   echo "${RED} $0 does not find any valid ip to scan"
 fi
 
