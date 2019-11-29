@@ -260,7 +260,15 @@ create_sub_kpn(){
 # Random note hash
 rhash=$(hash_gen)
 # create directory
-mydir=$2/$1
+echo "$# "
+if [ $# -eq 6 ]; then
+  mydir=$2$1
+else
+  mydir=$2$8
+fi  
+echo "$mydir and ip: $1 and box:$8"
+echo "$1 $2 $3 $4 $5 $6 $7 $8 "
+return 1
 mkdir $mydir
 #creade node 
 cat <<EOF > $mydir/node.xml
@@ -293,19 +301,24 @@ if [ "$4" = "on" ]; then
   # Initializing variables
   ports_tcp=""
   ports_udp=""
-  for port in $(cat $mydir/masscan.txt | grep -i open  | grep -i tcp |cut  -d " " -f 4 | cut -d "/" -f 1) ; do ports_tcp="$port,$ports_tcp"  ; done
-  ports_tcp=$(echo $ports_tcp | sed 's/.$//'  )
+  if [ -f $mydir/masscan.txt ]; then
+    for port in $(cat $mydir/masscan.txt | grep -i open  | grep -i tcp |cut  -d " " -f 4 | cut -d "/" -f 1) ; do ports_tcp="$port,$ports_tcp"  ; done
+    ports_tcp=$(echo $ports_tcp | sed 's/.$//'  )
 
-  for port in $(cat $mydir/masscan.txt | grep -i open  | grep -i udp |cut  -d " " -f 4 | cut -d "/" -f 1) ; do ports_udp="$port,$ports_udp"  ; done
-  ports_udp=$(echo $ports_udp | sed 's/.$//'  )
-  #echo "ports scan : $ports_tcp"
-  if [ $(echo $ports_tcp | wc -w)   -ne 0 ]; then
-     nmap  -sV -sS -p $ports_tcp -T4 -sC  -oN $mydir/nmap.txt  $1
-  fi
-  if [ $(echo $ports_udp | wc -w)   -ne 0 ]; then
-     nmap  -sV -sS -sU -p $ports_udp -T4 -sC  -oN $mydir/nmap2.txt  $1
-     udp=1
-  fi
+    for port in $(cat $mydir/masscan.txt | grep -i open  | grep -i udp |cut  -d " " -f 4 | cut -d "/" -f 1) ; do ports_udp="$port,$ports_udp"  ; done
+    ports_udp=$(echo $ports_udp | sed 's/.$//'  )
+    #echo "ports scan : $ports_tcp"
+    if [ $(echo $ports_tcp | wc -w)   -ne 0 ]; then
+       nmap  -sV -sS -p $ports_tcp -T4 -sC  -oN $mydir/nmap.txt  $1
+    fi
+    if [ $(echo $ports_udp | wc -w)   -ne 0 ]; then
+       nmap  -sV -sS -sU -p $ports_udp -T4 -sC  -oN $mydir/nmap2.txt  $1
+       udp=1
+    fi
+  else
+    echo "${RED}[ERROR]: masscan does not find any open port about '$1'. Maybe the host is down${NC}"
+    return 2
+  fi   
 else
   if [ "$3" = "l" ]; then
     nmap  -sV -sS  -T4 -oN $mydir/nmap.txt  $1
@@ -317,6 +330,7 @@ content=$(sed  's/.*/&<br>/'   $mydir/nmap.txt)
 if [ "$udp" -ne 0 ]; then 
 content="$content <br>Udp section : <br>  $(sed  's/.*/&<br>/'   $mydir/nmap2.txt) "
 fi
+if [ "$content" != "" ]; then 
 cat <<EOF > $mydir/page.html
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml"><body>
@@ -325,6 +339,7 @@ $content
 
 </body></html>
 EOF
+fi
 }
 
 verify_cidr_param(){
@@ -333,15 +348,15 @@ if expr "$1" : '.*:.*' >/dev/null; then
    if [ "$box" != "" ]; then
      verify_ip $(echo "$1" | cut -d: -f1)
      if [ $? -eq 0 ]; then
-        echo "${RED}ERROR: parameter \"--cidr=$1\" is not correct. Ip part is wrong. \n${YELLOW}Right format: ip:MachineName${NC}\n"
+        echo "${RED}[ERROR]: parameter \"--cidr=$1\" is not correct. Ip part is wrong. \n${YELLOW}Right format: ip:MachineName${NC}\n"
         exit 2
      else
       box_name="$box"
       cidrip="$(echo "$1" | cut -d: -f1)"
-      return 0
+      return 1
      fi
    else
-     echo "${RED}ERROR: parameter \"--cidr=$1\" is not correct. You should define a machine name like: ip:MachineName${NC}\n"
+     echo "${RED}[ERROR]: parameter \"--cidr=$1\" is not correct. You should define a machine name like: ip:MachineName${NC}\n"
      exit 2
    fi 
 elif expr "$1" : '.*/.*' >/dev/null; then
@@ -349,21 +364,22 @@ elif expr "$1" : '.*/.*' >/dev/null; then
    if [ "$cidre" != "" ] && [ $cidre -ge 1 -a $cidre -le 32 ]; then
      verify_ip  $(echo "$1" | cut -d"/" -f1)
      if [ $? -eq 0 ]; then
-        echo "${RED}ERROR: parameter \"--cidr=$1\" is not correct. Ip part is wrong. \n${YELLOW}Right format: ip/cidr${NC}\n"
+        echo "${RED}[ERROR]: parameter \"--cidr=$1\" is not correct. Ip part is wrong. \n${YELLOW}Right format: ip/cidr${NC}\n"
         exit 2     
      else
-      return 0
+      return 2
      fi 
    else
-       echo "${RED}ERROR: parameter \"--cidr=$1\" is not correct. '$cidre' should be an integer: 1<= cidr <=32 \n${YELLOW}Right format: ip/cidr${NC}\n" 
+       echo "${RED}[ERROR]: parameter \"--cidr=$1\" is not correct. '$cidre' should be an integer: 1<= cidr <=32 \n${YELLOW}Right format: ip/cidr${NC}\n" 
        exit 2
    fi   
 fi
 verify_ip  $1
 if [ $? -eq 0 ]; then
-   echo "${RED}ERROR: parameter \"--cidr=$1\" is not correct. Try a valid ip${NC}\n" 
+   echo "${RED}[ERROR]: parameter \"--cidr=$1\" is not correct. Try a valid ip${NC}\n" 
    exit 2    
 fi
+return 3
 }
 
 verify_ip(){
@@ -381,7 +397,7 @@ fi
 
 verify_net_interface(){
 if [ "$(ifconfig | grep $1 | cut -d: -f 1)" != "$1" ]; then
-   echo "${RED}ERROR: parameter \"--interface=$1\" is not correct. Interface '$1' not found ${NC}\n" 
+   echo "${RED}[ERROR]: parameter \"--interface=$1\" is not correct. Interface '$1' not found ${NC}\n" 
    exit 2
 fi   
 }
@@ -463,7 +479,7 @@ usage()
 if [ "$1" = "addto" ] || [ "$1" = "new" ] ; then
      cmd="$1"
 else
-     echo "${RED}ERROR: '$1'command does not exists${NC}"
+     echo "${RED}[ERROR]: '$1'command does not exists${NC}"
      usage
      exit
 fi 
@@ -506,7 +522,7 @@ while [ "$1" != "" ]; do
              if [ "$VALUE" = "h" ] || [ "$VALUE" = "l" ] ; then
                 scantype=$VALUE
              else 
-                echo "${RED}ERROR: value \"$VALUE\" for parameter \"$PARAM\" is wrong${NC}\n"
+                echo "${RED}[ERROR]: value \"$VALUE\" for parameter \"$PARAM\" is wrong${NC}\n"
                 usage $cmd
                 exit 1	
              fi
@@ -519,7 +535,7 @@ while [ "$1" != "" ]; do
              if [ "$VALUE" = "no" ] || [ "$VALUE" = "on" ]; then
                 masscan=$VALUE
              else 
-                echo "${RED}ERROR: value \"$VALUE\" for parameter \"$PARAM\" is wrong${NC}\n"
+                echo "${RED}[ERROR]: value \"$VALUE\" for parameter \"$PARAM\" is wrong${NC}\n"
                 usage $cmd
                 exit 1
              fi
@@ -532,7 +548,7 @@ while [ "$1" != "" ]; do
             if [ "$VALUE" -gt 0 ] ; then
                rate=$VALUE
             else
-               echo "${RED}ERROR: the value  \"$VALUE\" should be a positive integer only${NC}\n"
+               echo "${RED}[ERROR]: the value  \"$VALUE\" should be a positive integer only${NC}\n"
                usage $cmd
                exit 1
             fi
@@ -546,7 +562,7 @@ while [ "$1" != "" ]; do
               fi   
               required=$((required+1))
             else
-              echo "${RED}ERROR: the path \"$VALUE\" is not a directory !!${NC}\n"
+              echo "${RED}[ERROR]: the path \"$VALUE\" is not a directory !!${NC}\n"
               usage $cmd
               exit 1
             fi
@@ -556,7 +572,7 @@ while [ "$1" != "" ]; do
               file_ips=$VALUE
               required=$((required+1))	
             else
-              echo "${RED}ERROR: cannot access \"$VALUE\" no such file !!${NC}\n"
+              echo "${RED}[ERROR]: cannot access \"$VALUE\" no such file !!${NC}\n"
               usage $cmd
               exit 1
             fi
@@ -570,13 +586,13 @@ while [ "$1" != "" ]; do
             if [ $? -ne 0 ]; then
                router_ip="$VALUE"
             else
-              echo "${RED}ERROR: the value  \"$VALUE\" is not a valid ip !!${NC}\n"
+              echo "${RED}[ERROR]: the value  \"$VALUE\" is not a valid ip !!${NC}\n"
               usage $cmd
               exit 1
             fi
             ;;
         *)
-            echo "${RED}ERROR: unknown parameter \"$PARAM\"${NC}\n"
+            echo "${RED}[ERROR]: unknown parameter \"$PARAM\"${NC}\n"
             usage $cmd
             exit 1
             ;;
@@ -586,29 +602,31 @@ done
 
 # Verify required params
 if [ ! -z $cidrip ] && [ ! -z $file_ips ]; then
-   echo "${RED}ERROR: Only use '--cidr' or '--ips-list'${NC}\n"
+   echo "${RED}[ERROR]: Only use '--cidr' or '--ips-list'${NC}\n"
    usage $cmd
 elif [ "$required" -ne 3 ] && [ "$cmd" = "new" ]; then
-   echo "${RED}ERROR: parameters '--name' and '--path' and ('--cidr' or '--ips-list') are required${NC}\n"
+   echo "${RED}[ERROR]: parameters '--name' and '--path' and ('--cidr' or '--ips-list') are required${NC}\n"
    usage $cmd
    exit 1
 elif [ "$required" -ne 2 ] && [ "$cmd" = "addto" ]; then
-   echo "${RED}ERROR: parameters '--path' and ('--cidr' or '--ips-list') are required${NC}\n"
+   echo "${RED}[ERROR]: parameters '--path' and ('--cidr' or '--ips-list') are required${NC}\n"
    usage $cmd
    exit 1
 elif [ "$masscan" = "on" ] && [ "$interface" = "" ]; then
-       echo "${RED}ERROR: the parameter '--interface' must be set when '--masscan' is enabled${NC}\n"
+       echo "${RED}[ERROR]: the parameter '--interface' must be set when '--masscan' is enabled${NC}\n"
        usage $cmd
        exit 1
 elif [ "$cmd" = "addto" ] && [ "$name" != "" ]; then
-       echo "${RED}ERROR: do not use the  parameter '--name' with the 'addto' command${NC}\n"
+       echo "${RED}[ERROR]: do not use the  parameter '--name' with the 'addto' command${NC}\n"
        usage $cmd
        exit 1     
 fi
 # verify --cidr and --interface
 box_name=""
+civer=0
 if [ ! -z $cidrip ]; then 
   verify_cidr_param $cidrip
+  civer=$?
 fi
 if [ "$masscan" = "on" ]; then  
   verify_net_interface $interface
@@ -621,51 +639,96 @@ if [ $(id -u)  -ne 0 ]; then
 fi
 
 if [ "$cmd" = "new" ]; then
-   dir="$rootDir$name"
-   scanfile=$dir/scan.txt
-   ipfile=$dir/boxes_ips.txt
+   dir="$rootDir$name/"
+   scanfile=$dirscan.txt
+   ipfile=$dirboxes_ips.txt
 elif [ -f "${rootDir}node.xml" ]; then  
     dir="$rootDir"
     scanfile="${dir}scan.txt"
     ipfile="${dir}boxes_ips.txt"
 else
-    echo "${RED}ERROR: parameter '--path', the directory '$rootDir' is not a valid keepnote report${NC}\n"
-        exit 1
+    echo "${RED}[ERROR]: Parameter '--path', the directory '$rootDir' is not a valid keepnote report${NC}\n"
+    exit 1
 fi   
 num_ips=0
-echo $cidrip
-echo $box_name
-exit 1
+
 if [ "$cmd" = "new" ]; then
+   echo "${YELLOW}Creation of a new report '$name' into '$rootDir'${NC}\n"
    create_keepNote $dir && \
-   cp -r $KEEPSCAN/template/__NOTEBOOK__ $dir/ 
+   cp -r $KEEPSCAN/template/__NOTEBOOK__ $dir 
 fi
 if [ "$file_ips" != "" ]; then
    cat $file_ips > $ipfile
 fi
-if [ "$box_name" != "" ]; then
+if [ $civer -eq 1 ]; then
    num_ips=$((num_ips+1))
-   create_sub_kpn $cidrip $dir $scantype $masscan $interface $rate $router_ip
-else
+   echo "${YELLOW}[SCAN From --cidr]: Scan of machine '$box_name' with the ip address $cidrip${NC}"
+   create_sub_kpn  $cidrip $dir $scantype $masscan $interface $rate $router_ip $box_name  
+elif [ $civer -eq 3 ]; then
+   num_ips=$((num_ips+1))
+   echo "${YELLOW}[SCAN From --cidr]: scan of $cidrip machine address${NC}"
+   create_sub_kpn $cidrip $dir $scantype $masscan $interface $rate $router_ip   
+elif [ $civer -eq 2 ]; then
    nmap --top-ports 100 -oN $scanfile $cidrip 
    cat $scanfile |  grep -i "Nmap scan" | grep -oE '((1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])\.){3}(1?[0-9][0-9]?|2[0-4][0-9]|25[0-5])' > $ipfile 
-
-   for ip in $(cat $ipfile );do
-     verify_ip $ip
-     if [ $? -ne 0 ]; then
-        num_ips=$((num_ips+1))
-        create_sub_kpn $ip $dir $scantype $masscan $interface $rate $router_ip
-     else
-       echo "${RED}\"$ip\" is not a valid ip${NC}"
-     fi 
-   done 
+fi
+iplist="/"
+machinelist="/"
+if [ -f $ipfile  ]; then
+   while IFS=: read -r ligne 
+   do
+      if [ "$ligne" != "" ]; then   
+       # spaces strip
+       ligne="$(echo $ligne | sed 's/  */:/g')"
+       if expr $ligne : '.*:.*' >/dev/null; then
+          ip=$(echo $ligne | cut -d ':' -f1)
+          name=$(echo $ligne | cut -d ':' -f2)
+          verify_ip $ip
+          if [ $? -ne 0 ]; then
+            echo "${YELLOW}[SCAN from IPS List]: Scan of machine '$name' with the ip address $ip${NC}"
+            nameregex=".*/$name/.*"
+            if   expr $machinelist : $nameregex >/dev/null; then
+               echo "${RED}[ERROR]: This machine name '$name' was already used${NC}"
+            else
+              create_sub_kpn $ip $dir $scantype $masscan $interface $rate $router_ip $name 
+               machinelist="$machinelist$name/"   
+               num_ips=$((num_ips+1))
+            fi   
+          else
+            echo "${RED}[ERROR]: \"$ip\" is not a valid ip${NC}"
+          fi 
+       else
+          ip=$(echo $ligne | cut -d ':' -f1)
+          verify_ip $ip
+          if [ $? -ne 0 ]; then
+            echo "${YELLOW}[SCAN from IPS List]: Scan of $ip machine address${NC}"
+            ipregex=".*/$ip/.*"
+            if ! expr $iplist : $ipregex >/dev/null; then
+               create_sub_kpn $ip $dir $scantype $masscan $interface $rate $router_ip 
+               iplist="$iplist$ip/"
+               num_ips=$((num_ips+1))
+            else
+               echo "${RED}[ERROR]: This machine ip '$ip' was already used${NC}"
+            fi   
+          else
+            echo "${RED}[ERROR]: \"$ip\" is not a valid ip${NC}"
+          fi  
+       fi
+      fi 
+   done <"$ipfile"
+# clean report 
+rm  $ipfile  
 fi   
+## cleean report 
+if [ -f $scanfile ]; then
+   rm $scanfile
+fi  
 if [ $num_ips -gt 0 ]; then   
-   echo "${GREEN} $0 successfully scaned $num_ips ip(s)"
+   echo "${GREEN}\n$0 successfully scaned $num_ips ip(s)"
    # If user want to let created report writable by a local user 
-   echo "${YELLOW}If you want to let this report writable by the local user, tape :"
+   echo "\n${YELLOW}If you want to let this report writable by the local user, tape :"
    echo "${GREEN}sudo chown -R \$(whoami):\$(whoami) $dir"
 else
-   echo "${RED} $0 does not find any valid ip to scan"
+   echo "\n${RED}$0 does not find any valid ip to scan"
 fi
 
