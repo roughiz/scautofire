@@ -24,7 +24,7 @@ hash5=$(hash_gen)
 
 create_keepNote(){
 # create directory
-dir=$1
+dir=$1 
 mkdir $dir
 #create node 
 cat <<EOF > $dir/node.xml
@@ -267,6 +267,11 @@ else
   mydir=$2$8
   title=$8
 fi
+# check if box name already exists
+if [ -d "$mydir" ]; then
+  echo "${RED}\n[ERROR]: This box name '$title' already exists${NC}"
+  return 2
+fi    
 mkdir $mydir
 #creade node 
 cat <<EOF > $mydir/node.xml
@@ -641,10 +646,15 @@ if [ $(id -u)  -ne 0 ]; then
         exit 1
 fi
 
-if [ "$cmd" = "new" ]; then
+if [ "$cmd" = "new" ]; then 
    dir="$rootDir$name/"
    scanfile="${dir}scan.txt"
    ipfile="${dir}boxes_ips.txt"
+   # verify if the report already exists 
+   if [ -d $dir ]; then 
+     echo "${RED}\n[ERROR]: This report '$dir' already exists${NC}"
+    exit 2
+   fi 
 elif [ -f "${rootDir}node.xml" ]; then  
     dir="$rootDir"
     scanfile="${dir}scan.txt"
@@ -728,7 +738,7 @@ if [ -f $ipfile  ]; then
       fi 
    done <"$ipfile"
 # clean report 
-rm  $ipfile    
+rm  $ipfile  
 fi        
 ## cleean report 
 if [ -f $scanfile ]; then
@@ -736,15 +746,26 @@ if [ -f $scanfile ]; then
 fi
 if [ $num_ips -gt 0 ]; then   
    echo "${GREEN}\n$0 successfully scaned $num_ips ip(s)"
-   if [ "$SUDO_USER" != "" ];then
-     chown -R ${SUDO_USER}:${SUDO_USER} $dir && \
-     su -c "keepnote --no-show-errors $dir &" $SUDO_USER
+   # if script runs with sudo, run the keepnote as the sudo user
+   if [ "$SUDO_USER" != "" ]; then
+     if [ "$cmd" = "addto" ] && [ -f "${dir}trash/node.xml" ]; then
+        boxnumbs=$(ls ${dir}*/node.xml | wc -w)
+        sed -i -e 's/.*order.*integer.*/  <key>order<\/key><integer>'$((boxnumbs-1))'<\/integer>/' ${dir}trash/node.xml
+     fi    
+     chown -R ${SUDO_USER}:${SUDO_USER} $dir && \ 
+     su -c "keepnote --no-show-errors --newproc --no-default  $dir &" $SUDO_USER && \
      exit 0
    else
-      keepnote --no-show-errors $dir &
+      if [ "$cmd" = "addto" ] && [ -f "${dir}trash/node.xml" ]; then
+        boxnumbs=$(ls ${dir}*/node.xml | wc -w)
+        sed -i -e 's/.*order.*integer.*/  <key>order<\/key><integer>'$((boxnumbs-1))'<\/integer>/' ${dir}trash/node.xml
+     fi 
+      keepnote --no-show-errors --newproc --no-default $dir &
       exit 0
    fi
 else
    echo "\n${RED}$0 does not find any valid ip to scan"
-   rm $dir
+   if [ "$cmd" = "new" ]; then
+     rm -rf $dir
+   fi  
 fi
