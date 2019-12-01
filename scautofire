@@ -745,26 +745,26 @@ if [ -f $scanfile ]; then
    rm $scanfile
 fi
 if [ $num_ips -gt 0 ]; then   
-   echo "${GREEN}\n$0 successfully scaned $num_ips ip(s)"
+   echo "${GREEN}\n$0 successfully scaned $num_ips ip(s)${NC}"
    # if script runs with sudo, run the keepnote as the sudo user
    if [ "$SUDO_USER" != "" ]; then
      if [ "$cmd" = "addto" ] && [ -f "${dir}trash/node.xml" ]; then
         boxnumbs=$(ls ${dir}*/node.xml | wc -w)
         sed -i -e 's/.*order.*integer.*/  <key>order<\/key><integer>'$((boxnumbs-1))'<\/integer>/' ${dir}trash/node.xml
      fi    
-     chown -R ${SUDO_USER}:${SUDO_USER} $dir && \ 
+     chown -R ${SUDO_USER}:${SUDO_USER} $dir 
      su -c "keepnote --no-show-errors --newproc --no-default  $dir &" $SUDO_USER && \
      exit 0
    else
       if [ "$cmd" = "addto" ] && [ -f "${dir}trash/node.xml" ]; then
         boxnumbs=$(ls ${dir}*/node.xml | wc -w)
         sed -i -e 's/.*order.*integer.*/  <key>order<\/key><integer>'$((boxnumbs-1))'<\/integer>/' ${dir}trash/node.xml
-     fi 
+      fi 
       keepnote --no-show-errors --newproc --no-default $dir &
       exit 0
    fi
 else
-   echo "\n${RED}$0 does not find any valid ip to scan"
+   echo "\n${RED}$0 does not find any valid ip to scan${NC}"
    if [ "$cmd" = "new" ]; then
      rm -rf $dir
    fi  
