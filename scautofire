@@ -255,32 +255,24 @@ cat <<EOF > $dir/notebook.nbk
 EOF
 }
 
-# create sub diretory for keepNote project
-create_sub_kpn(){
-# Random note hash
-rhash=$(hash_gen)
-# create directory
-if [ $# -eq 7 ]; then
-  mydir=$2$1
-  title=$1
-else
-  mydir=$2$8
-  title=$8
-fi
-# check if box name already exists
-if [ -d "$mydir" ]; then
-  echo "${RED}\n[ERROR]: This box name '$title' already exists${NC}"
+# create a keepnote node
+create_node(){
+# check if name already exists
+if [ -d "$1" ]; then
+  echo "${RED}\n[ERROR]: This $3 '$title' already exists${NC}"
   return 2
 fi    
-mkdir $mydir
+# Random note hash
+rhash=$(hash_gen)
+mkdir $1
 #creade node 
-cat <<EOF > $mydir/node.xml
+cat <<EOF > $1/node.xml
 <?xml version="1.0" encoding="UTF-8"?>
 <node>
 <version>6</version>
 <dict>
   <key>expanded</key><false/>
-  <key>title</key><string>$title</string>
+  <key>title</key><string>$2</string>
   <key>nodeid</key><string>$rhash</string>
   <key>modified_time</key><integer>$(date +%s)</integer>
   <key>version</key><integer>6</integer>
@@ -293,6 +285,144 @@ cat <<EOF > $mydir/node.xml
 </dict>
 </node>
 EOF
+}
+
+# verify a port 
+verify_port(){
+  if expr "$1" : '[0-9][0-9]*$' >/dev/null && [ $1 -gt 0 ] && [ $1 -le 65535 ]; then
+    return 0
+  else
+    return 1
+  fi 
+}
+
+# gobuster recon function
+run_gobuster(){
+  if [ "$(echo "$3" | grep -w "IIS")" != "" ]; then
+    extension=".html,.asp,.aspx,.php"
+  else
+    extension=".html,.php"
+  fi
+  gobuster  dir -w $2 --wildcard -k -l -e -s 200,204,301,302,307,401,403,405,501,500,502 -x $extension -t 30 -u $1 -o "$4/recon_${5}.txt" 
+}
+
+# recon little function 
+recon_basic(){
+boxe_path=$1
+ip=$2
+f_oports="$boxe_path/oports.txt"
+gobuster_enable=0
+sslscan_enable=0
+cat $boxe_path/nmap*.txt | grep  open > $f_oports
+used_ports="/"
+while IFS=: read -r ligne 
+   do  
+      ## http/Https recon
+      if expr "$ligne" : '.*http.*' >/dev/null ; then
+       port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
+       verify_port $port
+       port_etat=$?
+       if [ $port_etat -eq 1 ]; then
+        echo "${RED}\n[Warning]: This port '$port' is not correct${NC}"
+        continue
+       fi
+       if [ $port -eq 5985 ]; then
+         continue
+       fi   
+       if [ $gobuster_enable -eq 0 ]; then
+         create_node "$boxe_path/gobuster" "gobuster_recon" "recon node name "
+         gobuster_enable=$((gobuster_enable+1))
+       fi
+       reg_usep=".*/$port/.*"
+       if ! expr  "$used_ports" : $reg_usep >/dev/null ; then
+        used_ports="$used_ports${port}/"
+        if expr "$ligne" : '.*ssl/http.*' >/dev/null ; then
+          if [ $sslscan_enable -eq 0 ]; then
+            create_node "$boxe_path/sslscan" "ssl_recon" "recon node name "
+            sslscan_enable=$((sslscan_enable+1))
+          fi
+          url="https://$ip:$port"
+          echo "\n${YELLOW}[RECON SSL/TLS] Discover supported cipher suites for the url: $url${NC}"
+          sslyze --regular $ip:$port | tee ${boxe_path}/sslscan/sslscan_${port}.txt
+        else
+           curl -v -k --max-time 10 https://$ip:$port/ 2> /dev/null 1> /dev/null
+          if [ $? -eq 0 ]; then
+            if [ $sslscan_enable -eq 0 ]; then
+              create_node "$boxe_path/sslscan" "ssl_recon" "recon node name "
+              sslscan_enable=$((sslscan_enable+1))
+            fi
+            url="https://$ip:$port"
+            echo "\n${YELLOW}[RECON SSL/TLS] Discover supported cipher suites for the url: $url${NC}"
+            sslyze --regular $ip:$port | tee ${boxe_path}/sslscan/sslscan_${port}.txt
+          else
+            url="http://$ip:$port"
+          fi
+        fi
+       else
+         continue 
+       fi  
+       echo "\n${YELLOW}[RECON Http/Https] Running gobuster for the url: $url${NC}"
+       run_gobuster $url $common_wordlist "$ligne" "$boxe_path/gobuster" $port
+      fi
+      ## 
+   done <"$f_oports" 
+rm $f_oports
+# sanitize output for recon folders
+# gobuster
+if [ $gobuster_enable -ne 0 ]; then
+  content=""
+  for port in $( ls ${boxe_path}/gobuster/recon_*.txt)
+   do 
+     portnumber=$(basename $port | cut -d'_' -f2 | cut -d'.' -f 1 )
+     content="$content <span style='font-size: 16pt'><b><span style='color: #ff0000'><br/>Recon for port '$portnumber' :</span></b></span><span style='font-size: 15pt'>"
+     content="$content <span style='color: #000000'><span style='font-family: Sans'><br><br> $(sed  -e 's/</\&lt;/g'  -e 's/>/\&gt;/g'  -e 's/.*/&<br>/'   $port) <br/></span></span></span><br/>"
+   done
+cat <<EOF > ${boxe_path}/gobuster/page.html
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"><body>
+
+$content
+</body></html>
+EOF
+rm -rf ${boxe_path}/gobuster/recon_*.txt
+fi 
+
+# sslyze
+if [ $sslscan_enable -ne 0 ]; then
+  content=""
+  for port in $( ls ${boxe_path}/sslscan/sslscan_*.txt)
+   do 
+     portnumber=$(basename $port | cut -d'_' -f2 | cut -d'.' -f 1 )
+     content="$content <span style='font-size: 16pt'><b><span style='color: #ff0000'><br/>Recon for port '$portnumber' :</span></b></span><span style='font-size: 15pt'>"
+     content="$content <span style='color: #000000'><span style='font-family: Sans'><br><br> $(sed  -e 's/</\&lt;/g'  -e 's/>/\&gt;/g'  -e 's/.*/&<br>/'   $port) <br/></span></span></span><br/>"
+   done
+cat <<EOF > ${boxe_path}/sslscan/page.html
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"><body>
+
+$content
+</body></html>
+EOF
+rm -rf ${boxe_path}/sslscan/sslscan_*.txt
+fi 
+
+}
+
+# create sub diretory for a host
+create_sub_kpn(){
+# create directory
+if [ $# -eq 8 ]; then
+  mydir=$2$1
+  title=$1
+  lrecon=$8
+else
+  mydir=$2$8
+  title=$8
+  lrecon=$9
+fi
+
+# ceate keepnote node
+create_node $mydir $title "box name "
 # masscan 
 udp=0
 if [ "$4" = "on" ]; then
@@ -342,6 +472,11 @@ cat <<EOF > $mydir/page.html
 $content
 </body></html>
 EOF
+fi
+if [ "$lrecon" = "l" ]; then
+  recon_basic $mydir $1 
+elif [ "$lrecon" = "h" ]; then
+   recon_huge $mydir $1
 fi
 return 0
 }
@@ -421,7 +556,7 @@ usage()
      echo "\n${GREEN}Flags:${NC}"
      echo "\t -h, --help                   help for addto"
      echo "\t     --type=string            l|h  ['h' for huge scan(all ports) and 'l' for light scan(for commun ports)]           (light by default)"
-     
+     echo "\t     --recon=string           l|h  ['h' for huge recon(Use big dictionary) and 'l' for light scan(Use common dictionary wordlist)] " 
      echo "\t     --masscan=string         on|no ['on' to enable masscan and 'no' to disable masscan]                             (enable by default)"
      echo "\t     --interface=string       The network interface to use with masscan, required if masscan is enabled"
      echo "\t     --rate=int               The speed of masscan, 150<value<1000                                                   (set to 150 by default)"
@@ -433,6 +568,7 @@ usage()
      echo "\t                                      in the report instead of the ip. Using space for the separation"
      echo "\n${GREEN}Examples :${NC}\n"
      echo "Default scan using Masscan with a rate of 500:  \n\t$0 addto --path=/path/to/exists/report/directory --rate=500 --interface=tun0  --cidr=10.10.10.0/16\n"
+     echo "Default scan using Masscan with a light reconnaissance:  \n\t$0 addto --path=/path/to/exists/report/directory --interface=tun0  --cidr=10.10.10.0/16 --scan=l\n"
      echo "Default scan using Masscan with a rate of 500, scan one ip and define the name to show instead of ip:  \n\t$0 addto  --path=/path/to/exists/report/directory --rate=500 --interface=tun0  --cidr=10.10.10.12:Box12\n"
      echo "Default scan using Masscan and a list of ips, with the router ip gateway :  \n$0 addto  --path=/path/to/exists/report/directory --ips-list=file --interface=tun0  --router-ip=192.168.55.1 \n"
      echo "Create a report scan with a light scan without Masscan :\n$0 addto --masscan=no  --path=/path/to/exists/report/directory --cidr=10.10.10.14\n"
@@ -444,7 +580,7 @@ usage()
      echo "\n${GREEN}Flags:${NC}"
      echo "\t -h, --help                   help for new"
      echo "\t     --type=string            l|h  ['h' for huge scan(all ports) and 'l' for light scan(for commun ports)]           (light by default)"
-     
+     echo "\t     --recon=string           l|h  ['h' for huge recon(Use big dictionary) and 'l' for light scan(Use common dictionary wordlist)] "
      echo "\t     --masscan=string         on|no ['on' to enable masscan and 'no' to disable masscan]                             (enable by default)"
      echo "\t     --interface=string       The network interface to use with masscan, required if masscan is enabled"
      echo "\t     --rate=int               The speed of masscan, 150<value<1000                                                   (set to 150 by default)"
@@ -457,6 +593,7 @@ usage()
      echo "\t                                      in the report instead of the ip. Using space for the separation"
      echo  "\n${GREEN}Examples :${NC}\n"
      echo "Default scan using Masscan with a rate of 500:  \n\t$0 new --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=10.10.10.0/16\n"
+     echo "Default scan using Masscan with a light reconnaissance:  \n\t$0 new --name=report-name --path=/path/to/exists/report/directory --interface=tun0  --cidr=10.10.10.0/16 --scan=l\n"
      echo "Default scan using Masscan with a rate of 500, scan one ip and define the name to show instead of ip:  \n\t$0 new --name=report-name --path=/path/to/report/destination_directory --rate=500 --interface=tun0  --cidr=10.10.10.12:Box12\n"
      echo "Default scan using Masscan and a list of ips, with the router ip gateway :  \n$0 new --name=report-name --path=/path/to/report/destination_directory --ips-list=file --interface=tun0  --router-ip=192.168.55.1 \n"
      echo "Create a report scan with a light scan without Masscan :\n$0 new --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.14\n"
@@ -498,15 +635,20 @@ rate=150
 file_ips=""
 cidrip=""
 router_ip="-"
+recon="-"
 addto=""
 newrep=""
 gks=$(env | grep KEEPSCAN)
 if [ "$gks" = "" ];then
   if [ -d  "/usr/share/KeepScan/template" ]; then
-       KEEPSCAN="/usr/share/KeepScan"
+    KEEPSCAN="/usr/share/KeepScan"
+    common_wordlist="${KEEPSCAN}/wordlist/common.txt"
+    big_wordlist="${KEEPSCAN}/wordlist/big.txt"
   else
     if [ -d "./template" ]; then 
       KEEPSCAN="."
+      common_wordlist="./wordlist/common.txt"
+      big_wordlist="./wordlist/big.txt"
     else
       print "You should be in the KeepScan directory, or install it globally !!"
       exit 1 
@@ -531,6 +673,15 @@ while [ "$1" != "" ]; do
                 exit 1	
              fi
              ;;
+        --recon)
+             if [ "$VALUE" = "h" ] || [ "$VALUE" = "l" ] ; then
+                recon=$VALUE
+             else 
+                echo "${RED}\n[ERROR]: value \"$VALUE\" for parameter \"$PARAM\" is wrong${NC}\n"
+                usage $cmd
+                exit 1  
+             fi
+             ;;     
         --name)
             name=$VALUE
             required=$((required+1))
@@ -675,13 +826,13 @@ if [ "$file_ips" != "" ]; then
 fi
 if [ $civer -eq 1 ]; then
    echo "${YELLOW}[SCAN From --cidr]: Scan of machine '$box_name' with the ip address $cidrip\n${NC}"
-   create_sub_kpn  $cidrip $dir $scantype $masscan $interface $rate $router_ip $box_name
+   create_sub_kpn  $cidrip $dir $scantype $masscan $interface $rate $router_ip $box_name $recon
    if [ $? -ne 2 ]; then
       num_ips=$((num_ips+1))
    fi
 elif [ $civer -eq 3 ]; then
    echo "${YELLOW}[SCAN From --cidr]: scan of $cidrip machine address\n${NC}"
-   create_sub_kpn $cidrip $dir $scantype $masscan $interface $rate $router_ip
+   create_sub_kpn $cidrip $dir $scantype $masscan $interface $rate $router_ip $recon
    if [ $? -ne 2 ]; then
       num_ips=$((num_ips+1))
    fi   
@@ -707,7 +858,7 @@ if [ -f $ipfile  ]; then
             if   expr $machinelist : $nameregex >/dev/null; then
                echo "${RED}\n[ERROR]: This machine name '$name' was already used${NC}"
             else
-              create_sub_kpn $ip $dir $scantype $masscan $interface $rate $router_ip $name
+              create_sub_kpn $ip $dir $scantype $masscan $interface $rate $router_ip $name $recon
               if [ $? -ne 2 ]; then
                  num_ips=$((num_ips+1))
               fi 
@@ -723,7 +874,7 @@ if [ -f $ipfile  ]; then
             echo "${YELLOW}[SCAN from IPS List]: Scan of $ip machine address\n${NC}"
             ipregex=".*/$ip/.*"
             if ! expr $iplist : $ipregex >/dev/null; then
-               create_sub_kpn $ip $dir $scantype $masscan $interface $rate $router_ip 
+               create_sub_kpn $ip $dir $scantype $masscan $interface $rate $router_ip $recon
                if [ $? -ne 2 ]; then
                   num_ips=$((num_ips+1))
                fi
