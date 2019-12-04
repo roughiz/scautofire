@@ -296,6 +296,31 @@ verify_port(){
   fi 
 }
 
+# write into the keepnote page as Html arg1 path_node/page.html; args: patern(s) of  file(s) to write, as per ex '${boxe_path}/sslscan/sslscan_*.txt'  
+# Ex: write_to_pager path_node/page.html ${boxe_path}/sslscan/sslscan_*.txt ${boxe_path}/sslscan/sslscan2_*.txt 
+write_to_page(){
+page=$1
+content=""
+shift
+while [ "$1" != "" ]; do
+  for port in $( ls $1 2>/dev/null)
+   do 
+     portnumber=$(basename $port | cut -d'_' -f2 | cut -d'.' -f 1 )
+     content="$content <span style='font-size: 16pt'><b><span style='color: #ff0000'><br/>Recon for port '$portnumber' :</span></b></span><span style='font-size: 15pt'>"
+     content="$content <span style='color: #000000'><span style='font-family: Sans'><br><br>$(sed  -e 's/</\&lt;/g'  -e 's/>/\&gt;/g'  -e 's/.*/&<br>/'   $port) <br/></span></span></span><br/>"
+   done
+  rm -rf $1 
+  shift 
+done  
+cat <<EOF > $page
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"><body>
+
+$content
+</body></html>
+EOF
+}
+
 # gobuster recon function
 run_gobuster(){
   if [ "$(echo "$3" | grep -w "IIS")" != "" ]; then
@@ -303,7 +328,11 @@ run_gobuster(){
   else
     extension=".html,.php"
   fi
-  gobuster  dir -w $2 --wildcard -k -l -e -s 200,204,301,302,307,401,403,405,501,500,502 -x $extension -t 30 -u $1 -o "$4/recon_${5}.txt" 
+  gobuster  dir -w $2 --wildcard -k -l -e -s 200,204,301,302,307,401,405,501,500,502 -x $extension -t 20 -u $1 -o "$4/recon_${5}.txt" 
+  if [ -f  $4/recon_${5}.txt ]; then
+    sort $4/recon_${5}.txt | uniq > $4/recon_tmp.txt
+    cat $4/recon_tmp.txt > $4/recon_${5}.txt
+  fi  
 }
 
 # recon little function 
@@ -314,7 +343,13 @@ f_oports="$boxe_path/oports.txt"
 gobuster_enable=0
 sslscan_enable=0
 cat $boxe_path/nmap*.txt | grep  open > $f_oports
+
 used_ports="/"
+
+if [ ! -f $f_oports ]; then
+    echo "${RED}\n[ERROR]: Recon does not found any nmap file${NC}"
+    return 2
+fi  
 while IFS=: read -r ligne 
    do  
       ## http/Https recon
@@ -330,7 +365,7 @@ while IFS=: read -r ligne
          continue
        fi   
        if [ $gobuster_enable -eq 0 ]; then
-         create_node "$boxe_path/gobuster" "gobuster_recon" "recon node name "
+         create_node "$boxe_path/gobuster" "Gobuster_Recon" "recon node name "
          gobuster_enable=$((gobuster_enable+1))
        fi
        reg_usep=".*/$port/.*"
@@ -338,14 +373,14 @@ while IFS=: read -r ligne
         used_ports="$used_ports${port}/"
         if expr "$ligne" : '.*ssl/http.*' >/dev/null ; then
           if [ $sslscan_enable -eq 0 ]; then
-            create_node "$boxe_path/sslscan" "ssl_recon" "recon node name "
+            create_node "$boxe_path/sslscan" "SSL_Recon" "recon node name "
             sslscan_enable=$((sslscan_enable+1))
           fi
           url="https://$ip:$port"
           echo "\n${YELLOW}[RECON SSL/TLS] Discover supported cipher suites for the url: $url${NC}"
           sslyze --regular $ip:$port | tee ${boxe_path}/sslscan/sslscan_${port}.txt
         else
-           curl -v -k --max-time 10 https://$ip:$port/ 2> /dev/null 1> /dev/null
+          curl -v -k --max-time 10 https://$ip:$port/ 2> /dev/null 1> /dev/null
           if [ $? -eq 0 ]; then
             if [ $sslscan_enable -eq 0 ]; then
               create_node "$boxe_path/sslscan" "ssl_recon" "recon node name "
@@ -364,47 +399,42 @@ while IFS=: read -r ligne
        echo "\n${YELLOW}[RECON Http/Https] Running gobuster for the url: $url${NC}"
        run_gobuster $url $common_wordlist "$ligne" "$boxe_path/gobuster" $port
       fi
-      ## 
+
+      # smb recon
+
    done <"$f_oports" 
 rm $f_oports
 # sanitize output for recon folders
 # gobuster
 if [ $gobuster_enable -ne 0 ]; then
-  content=""
-  for port in $( ls ${boxe_path}/gobuster/recon_*.txt)
-   do 
-     portnumber=$(basename $port | cut -d'_' -f2 | cut -d'.' -f 1 )
-     content="$content <span style='font-size: 16pt'><b><span style='color: #ff0000'><br/>Recon for port '$portnumber' :</span></b></span><span style='font-size: 15pt'>"
-     content="$content <span style='color: #000000'><span style='font-family: Sans'><br><br> $(sed  -e 's/</\&lt;/g'  -e 's/>/\&gt;/g'  -e 's/.*/&<br>/'   $port) <br/></span></span></span><br/>"
-   done
-cat <<EOF > ${boxe_path}/gobuster/page.html
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml"><body>
-
-$content
-</body></html>
-EOF
-rm -rf ${boxe_path}/gobuster/recon_*.txt
+  write_to_page ${boxe_path}/gobuster/page.html ${boxe_path}/gobuster/recon_*.txt
 fi 
-
 # sslyze
 if [ $sslscan_enable -ne 0 ]; then
-  content=""
-  for port in $( ls ${boxe_path}/sslscan/sslscan_*.txt)
-   do 
-     portnumber=$(basename $port | cut -d'_' -f2 | cut -d'.' -f 1 )
-     content="$content <span style='font-size: 16pt'><b><span style='color: #ff0000'><br/>Recon for port '$portnumber' :</span></b></span><span style='font-size: 15pt'>"
-     content="$content <span style='color: #000000'><span style='font-family: Sans'><br><br> $(sed  -e 's/</\&lt;/g'  -e 's/>/\&gt;/g'  -e 's/.*/&<br>/'   $port) <br/></span></span></span><br/>"
-   done
-cat <<EOF > ${boxe_path}/sslscan/page.html
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml"><body>
-
-$content
-</body></html>
-EOF
-rm -rf ${boxe_path}/sslscan/sslscan_*.txt
+  write_to_page ${boxe_path}/sslscan/page.html ${boxe_path}/sslscan/sslscan_*.txt
 fi 
+
+# recon cms
+cms_enable=0
+cms=`cat $boxe_path/nmap*.txt | grep http-generator | cut -d ":" -f 2`
+if [ "$cms"  != "" ]; then
+    create_node "$boxe_path/cms" "CMS_Recon" "recon node name "
+    echo "\n${YELLOW}[RECON CMS] Starting CMS Reconnaissance${NC}"
+    for line in $cms; do
+      port=`cat $boxe_path/nmap*.txt | grep $line -B1 | grep -w "open" | cut -d "/" -f 1`
+      case "$line" in
+        *Joomla!*) joomscan --url $ip:$port 1> ${boxe_path}/cms/joomlascan_${port}.txt && cms_enable=$((cms_enable+1));;
+        *WordPress*) echo -e "\n" | wpscan --url $ip:$port --enumerate p | tee ${boxe_path}/cms/wpscan_${port}.txt && cms_enable=$((cms_enable+1));;
+        *Drupal*) droopescan scan drupal -u $ip:$port | tee ${boxe_path}/cms/drupalscan_${port}.txt && cms_enable=$((cms_enable+1));;
+        *SharePoint*) gobuster  dir -w $sharepoint_wordlist --wildcard -k -l -e -s 200,204,301,302,307,401,403,405,501,500,502  -t 30 -u http://$1 -o "${boxe_path}/cms/sharepointscan_${port}.txt" && cms_enable=$((cms_enable+1));;
+      esac
+    done
+fi
+if [ $cms_enable -ne 0 ]; then
+  write_to_page ${boxe_path}/cms/page.html ${boxe_path}/cms/joomlascan_*.txt ${boxe_path}/cms/wpscan_*.txt ${boxe_path}/cms/drupalscan_*.txt ${boxe_path}/cms/sharepointscan_*.txt
+else
+  rm -rf $boxe_path/cms
+fi  
 
 }
 
@@ -644,11 +674,13 @@ if [ "$gks" = "" ];then
     KEEPSCAN="/usr/share/KeepScan"
     common_wordlist="${KEEPSCAN}/wordlist/common.txt"
     big_wordlist="${KEEPSCAN}/wordlist/big.txt"
+    sharepoint_wordlist="${KEEPSCAN}/wordlist/sharepoint.txt"
   else
     if [ -d "./template" ]; then 
       KEEPSCAN="."
       common_wordlist="./wordlist/common.txt"
       big_wordlist="./wordlist/big.txt"
+      sharepoint_wordlist="./wordlist/sharepoint.txt"
     else
       print "You should be in the KeepScan directory, or install it globally !!"
       exit 1 
