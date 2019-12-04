@@ -298,6 +298,7 @@ verify_port(){
 
 # write into the keepnote page as Html arg1 path_node/page.html; args: patern(s) of  file(s) to write, as per ex '${boxe_path}/sslscan/sslscan_*.txt'  
 # Ex: write_to_pager path_node/page.html ${boxe_path}/sslscan/sslscan_*.txt ${boxe_path}/sslscan/sslscan2_*.txt 
+# Nota files name should have an only one "_" caracter and weuse multiple with the sameport use  ...sslscan/sslscan2_*.txt* per example 
 write_to_page(){
 page=$1
 content=""
@@ -332,6 +333,7 @@ run_gobuster(){
   if [ -f  $4/recon_${5}.txt ]; then
     sort $4/recon_${5}.txt | uniq > $4/recon_tmp.txt
     cat $4/recon_tmp.txt > $4/recon_${5}.txt
+    rm $4/recon_tmp.txt
   fi  
 }
 
@@ -377,7 +379,7 @@ while IFS=: read -r ligne
             sslscan_enable=$((sslscan_enable+1))
           fi
           url="https://$ip:$port"
-          echo "\n${YELLOW}[RECON SSL/TLS] Discover supported cipher suites for the url: $url${NC}"
+          echo "\n${YELLOW}[RECON SSL/TLS] Discover supported cipher suites for the url: $url \n${NC}"
           sslyze --regular $ip:$port | tee ${boxe_path}/sslscan/sslscan_${port}.txt
         else
           curl -v -k --max-time 10 https://$ip:$port/ 2> /dev/null 1> /dev/null
@@ -387,7 +389,7 @@ while IFS=: read -r ligne
               sslscan_enable=$((sslscan_enable+1))
             fi
             url="https://$ip:$port"
-            echo "\n${YELLOW}[RECON SSL/TLS] Discover supported cipher suites for the url: $url${NC}"
+            echo "\n${YELLOW}[RECON SSL/TLS] Discover supported cipher suites for the url: $url \n${NC}"
             sslyze --regular $ip:$port | tee ${boxe_path}/sslscan/sslscan_${port}.txt
           else
             url="http://$ip:$port"
@@ -396,12 +398,53 @@ while IFS=: read -r ligne
        else
          continue 
        fi  
-       echo "\n${YELLOW}[RECON Http/Https] Running gobuster for the url: $url${NC}"
+       echo "\n${YELLOW}[RECON Http/Https] Running gobuster for the url: $url \n${NC}"
        run_gobuster $url $common_wordlist "$ligne" "$boxe_path/gobuster" $port
       fi
-
       # smb recon
-
+      if expr "$ligne" : '.*445/tcp.*' >/dev/null ; then
+        port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
+        verify_port $port
+        port_etat=$?
+        if [ $port_etat -eq 1 ]; then
+          echo "${RED}\n[Warning]: This port '$port' is not correct${NC}"
+          continue
+        fi
+        create_node "$boxe_path/smbrecon" "SMB_Recon" "recon node name "
+        create_node "$boxe_path/smbvulns" "SMB_Vulns" "recon node name "
+        smbclient -N -L $ip | tee ${boxe_path}/smbrecon/smbrecon_${port}.txt
+        smbmap -H $ip | tee ${boxe_path}/smbrecon/smbrecon_${port}.txt2
+        nmap -Pn -p445 --script vuln $ip -oN ${boxe_path}/smbvulns/smbvulns_${port}.txt
+        write_to_page ${boxe_path}/smbvulns/page.html ${boxe_path}/smbvulns/smbvulns_*.txt
+        write_to_page ${boxe_path}/smbrecon/page.html ${boxe_path}/smbrecon/smbrecon_*.txt*
+      fi
+      # netbios recon
+      if expr "$ligne" : '.*139/tcp.*' >/dev/null ; then
+        port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
+        verify_port $port
+        port_etat=$?
+        if [ $port_etat -eq 1 ]; then
+          echo "${RED}\n[Warning]: This port '$port' is not correct${NC}"
+          continue
+        fi
+        create_node "$boxe_path/netbiosrecon" "Netbios_Recon" "recon node name "
+        enum4linux -a $ip | tee ${boxe_path}/netbiosrecon/netbiosrecon_${port}.txt
+        write_to_page ${boxe_path}/netbiosrecon/page.html ${boxe_path}/netbiosrecon/netbiosrecon_*.txt
+      fi  
+      # snmp recon
+      if expr "$ligne" : '.*161/udp.*' >/dev/null ; then
+        port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
+        verify_port $port
+        port_etat=$?
+        if [ $port_etat -eq 1 ]; then
+          echo "${RED}\n[Warning]: This port '$port' is not correct${NC}"
+          continue
+        fi
+        create_node "$boxe_path/snmprecon" "SNMP_Recon" "recon node name "
+        snmp-check -t $ip -c public  | tee ${boxe_path}/snmprecon/snmprecon_${port}.txt
+        nmap -sV -O --script "snmp-*" -sU  -p 161 $ip -oN ${boxe_path}/snmprecon/snmprecon_${port}.txt2
+        write_to_page ${boxe_path}/snmprecon/page.html ${boxe_path}/snmprecon/snmprecon_*.txt*
+      fi  
    done <"$f_oports" 
 rm $f_oports
 # sanitize output for recon folders
@@ -455,6 +498,7 @@ fi
 create_node $mydir $title "box name "
 # masscan 
 udp=0
+tcp=0
 if [ "$4" = "on" ]; then
   if [ "$7" = "-" ];then 
      masscan -p1-65535,U:1-65535 $1 --rate=$6 -e $5  > $mydir/masscan.txt
@@ -473,6 +517,7 @@ if [ "$4" = "on" ]; then
     #echo "ports scan : $ports_tcp"
     if [ $(echo $ports_tcp | wc -w)   -ne 0 ]; then
        nmap  -sV -sS -p $ports_tcp -T4 -sC  -oN $mydir/nmap.txt  $1
+       tcp=1
     fi
     if [ $(echo $ports_udp | wc -w)   -ne 0 ]; then
        nmap  -sV -sS -sU -p $ports_udp -T4 -sC  -oN $mydir/nmap2.txt  $1
@@ -490,7 +535,10 @@ else
     nmap  -sV -sS -p- -T4 -sC  -oN $mydir/nmap.txt  $1
   fi
 fi
-content=$(sed   -e 's/</\&lt;/g'  -e 's/>/\&gt;/g'  -e 's/.*/&<br>/'  $mydir/nmap.txt)
+content=""
+if [ "$tcp" -ne 0 ]; then 
+content="${content}$(sed   -e 's/</\&lt;/g'  -e 's/>/\&gt;/g'  -e 's/.*/&<br>/'  $mydir/nmap.txt)"
+fi
 if [ "$udp" -ne 0 ]; then 
 content="$content </span></b></span><span style='font-size: 16pt'><b><span style='color: #ff0000'><br/><br/>Udp section :</span></b></span><span style='font-size: 15pt'><span style='color: #000000'><span style='font-family: Sans'><br/><br/>  $(sed  -e 's/</\&lt;/g'  -e 's/>/\&gt;/g'  -e 's/.*/&<br>/'   $mydir/nmap2.txt)"
 fi
