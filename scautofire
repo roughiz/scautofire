@@ -365,7 +365,16 @@ while IFS=: read -r ligne
        fi
        if [ $port -eq 5985 ]; then
          continue
-       fi   
+       fi
+       if expr "$ligne" : '.*Microsoft HTTPAPI.*' >/dev/null ; then
+         continue  
+       fi
+       if expr "$ligne" : '.*Microsoft Windows RPC.*' >/dev/null ; then
+         continue  
+       fi
+       if expr "$ligne" : '.*ncacn_http.*' >/dev/null ; then
+         continue  
+       fi
        if [ $gobuster_enable -eq 0 ]; then
          create_node "$boxe_path/gobuster" "Gobuster_Recon" "recon node name "
          gobuster_enable=$((gobuster_enable+1))
@@ -380,7 +389,8 @@ while IFS=: read -r ligne
           fi
           url="https://$ip:$port"
           echo "\n${YELLOW}[RECON SSL/TLS] Discover supported cipher suites for the url: $url \n${NC}"
-          sslyze --regular $ip:$port | tee ${boxe_path}/sslscan/sslscan_${port}.txt
+          echo "\$ sslyze --regular $ip:$port" | tee ${boxe_path}/sslscan/sslscan_${port}.txt
+          sslyze --regular $ip:$port >> ${boxe_path}/sslscan/sslscan_${port}.txt
         else
           curl -v -k --max-time 10 https://$ip:$port/ 2> /dev/null 1> /dev/null
           if [ $? -eq 0 ]; then
@@ -390,7 +400,8 @@ while IFS=: read -r ligne
             fi
             url="https://$ip:$port"
             echo "\n${YELLOW}[RECON SSL/TLS] Discover supported cipher suites for the url: $url \n${NC}"
-            sslyze --regular $ip:$port | tee ${boxe_path}/sslscan/sslscan_${port}.txt
+            echo "\$ sslyze --regular $ip:$port" | tee ${boxe_path}/sslscan/sslscan_${port}.txt
+            sslyze --regular $ip:$port >> ${boxe_path}/sslscan/sslscan_${port}.txt
           else
             url="http://$ip:$port"
           fi
@@ -401,23 +412,7 @@ while IFS=: read -r ligne
        echo "\n${YELLOW}[RECON Http/Https] Running gobuster for the url: $url \n${NC}"
        run_gobuster $url $common_wordlist "$ligne" "$boxe_path/gobuster" $port
       fi
-      # smb recon
-      if expr "$ligne" : '.*445/tcp.*' >/dev/null ; then
-        port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
-        verify_port $port
-        port_etat=$?
-        if [ $port_etat -eq 1 ]; then
-          echo "${RED}\n[Warning]: This port '$port' is not correct${NC}"
-          continue
-        fi
-        create_node "$boxe_path/smbrecon" "SMB_Recon" "recon node name "
-        create_node "$boxe_path/smbvulns" "SMB_Vulns" "recon node name "
-        smbclient -N -L $ip | tee ${boxe_path}/smbrecon/smbrecon_${port}.txt
-        smbmap -H $ip | tee ${boxe_path}/smbrecon/smbrecon_${port}.txt2
-        nmap -Pn -p445 --script vuln $ip -oN ${boxe_path}/smbvulns/smbvulns_${port}.txt
-        write_to_page ${boxe_path}/smbvulns/page.html ${boxe_path}/smbvulns/smbvulns_*.txt
-        write_to_page ${boxe_path}/smbrecon/page.html ${boxe_path}/smbrecon/smbrecon_*.txt*
-      fi
+
       # netbios recon
       if expr "$ligne" : '.*139/tcp.*' >/dev/null ; then
         port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
@@ -428,9 +423,95 @@ while IFS=: read -r ligne
           continue
         fi
         create_node "$boxe_path/netbiosrecon" "Netbios_Recon" "recon node name "
-        enum4linux -a $ip | tee ${boxe_path}/netbiosrecon/netbiosrecon_${port}.txt
+        echo "\n${YELLOW}[RECON Netbios] Running enum4linux enumeration \n${NC}"
+        enum4linux -a $ip 2> /dev/null > ${boxe_path}/netbiosrecon/netbiosrecon_${port}.txt
         write_to_page ${boxe_path}/netbiosrecon/page.html ${boxe_path}/netbiosrecon/netbiosrecon_*.txt
+        # verify if we found some users
+        enum4linux -U $ip 2> /dev/null > ${boxe_path}/netbiosrecon/enum-users.txt
+        if [ "$(cat ${boxe_path}/netbiosrecon/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 )" != "" ]; then
+          cat ${boxe_path}/netbiosrecon/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 > ${boxe_path}/netbiosrecon/users.txt
+        else
+          rm ${boxe_path}/netbiosrecon/enum-users.txt
+        fi
       fi  
+      # smb recon
+      if expr "$ligne" : '.*445/tcp.*' >/dev/null ; then
+        port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
+        verify_port $port
+        port_etat=$?
+        if [ $port_etat -eq 1 ]; then
+          echo "${RED}\n[Warning]: This port '$port' is not correct${NC}"
+          continue
+        fi
+        echo "\n${YELLOW}[RECON SMB] Enumeration of smb server \n${NC}"
+        create_node "$boxe_path/smbrecon" "SMB_Recon" "recon node name "
+        create_node "$boxe_path/smbvulns" "SMB_Vulns" "recon node name "
+        echo "\$ smbclient -N -L $ip" | tee ${boxe_path}/smbrecon/smbrecon_${port}.txt
+        smbclient -N -L $ip >> ${boxe_path}/smbrecon/smbrecon_${port}.txt
+        echo "\$ smbmap -H $ip" | tee ${boxe_path}/smbrecon/smbrecon_${port}.txt2
+        smbmap -H $ip >> ${boxe_path}/smbrecon/smbrecon_${port}.txt2
+        # smb enum with other users if foundedwith enum4linu
+        if [ "$(cat $f_oports | grep '139/tcp')" != "" ]; then 
+          # verify if we found some users
+          enum4linux -U $ip 2> /dev/null > ${boxe_path}/smbrecon/enum-users.txt
+          if [ "$(cat ${boxe_path}/smbrecon/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 )" != "" ]; then
+            cat ${boxe_path}/smbrecon/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 > ${boxe_path}/smbrecon/users.txt
+            for user in $(cat ${boxe_path}/smbrecon/users.txt); do 
+              if [ "$(smbmap -u $user  -H $ip | grep 'Authentication error')" =  "" ]; then
+                echo "\$ smbmap -u $user  -H $ip "  >  ${boxe_path}/smbrecon/smbrecon_${port}.txt$user
+                smbmap -u $user -H $ip   >>  ${boxe_path}/smbrecon/smbrecon_${port}.txt$user
+              fi
+            done  
+          else
+            rm ${boxe_path}/kerberos/enum-users.txt
+          fi        
+        fi
+        
+        nmap -Pn -p445 --script vuln $ip -oN ${boxe_path}/smbvulns/smbvulns_${port}.txt
+        write_to_page ${boxe_path}/smbvulns/page.html ${boxe_path}/smbvulns/smbvulns_*.txt
+        write_to_page ${boxe_path}/smbrecon/page.html ${boxe_path}/smbrecon/smbrecon_*.txt*
+      fi
+
+      # kerberos recon
+      if expr "$ligne" : '.*88/tcp.*' >/dev/null ; then
+        port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
+        verify_port $port
+        port_etat=$?
+        if [ $port_etat -eq 1 ]; then
+          echo "${RED}\n[Warning]: This port '$port' is not correct${NC}"
+          continue
+        fi
+        create_node "$boxe_path/kerberos" "Kerberos_Recon" "recon node name "
+        echo "\n${YELLOW}[RECON Kerberos] Kerberos enumeration \n${NC}"
+        domain="$(cat $f_oports | grep '445/tcp' | grep workgroup | cut -d':' -f2 | cut -d')' -f1)"
+        if [ "$domain" = "" ]; then
+          domain="$(enum4linux -a $ip 2>/dev/null | grep 'Domain Name'  | cut -d ':' -f 2)"
+        elif [ "$domain" = "" ]; then 
+          domain="WORKGROUP"
+        fi
+        ## comand with anonymous user
+        target="${domain}/guest"
+        echo "\$ GetNPUsers.py  -dc-ip $ip $target -no-pass"   > ${boxe_path}/kerberos/kerberosrecon_${port}.txt
+        GetNPUsers.py  -dc-ip $ip $target -no-pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt
+        if [ "$(cat $f_oports | grep '139/tcp')" != "" ]; then 
+          # verify if we found some users
+          enum4linux -U $ip 2> /dev/null > ${boxe_path}/kerberos/enum-users.txt
+          if [ "$(cat ${boxe_path}/kerberos/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 )" != "" ]; then
+            cat ${boxe_path}/kerberos/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 > ${boxe_path}/kerberos/users.txt
+            for user in $(cat ${boxe_path}/kerberos/users.txt); do 
+              target="${domain}"/$user
+              if [ "$(GetNPUsers.py  -dc-ip $ip $target -no-pass | grep 'SessionError')"  = "" ] &&  [ "$(GetNPUsers.py  -dc-ip $ip $target -no-pass | grep 'doesn.t have' )"  = "" ]; then
+                echo "\$ GetNPUsers.py  -dc-ip $ip $target -no-pass"   > ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
+                GetNPUsers.py  -dc-ip $ip $target -no-pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
+              fi
+            done  
+          else
+            rm ${boxe_path}/kerberos/enum-users.txt
+          fi        
+        fi
+        write_to_page $boxe_path/kerberos/page.html $boxe_path/kerberos/kerberosrecon_*.txt*
+      fi
+
       # snmp recon
       if expr "$ligne" : '.*161/udp.*' >/dev/null ; then
         port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
