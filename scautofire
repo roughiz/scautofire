@@ -301,13 +301,19 @@ verify_port(){
 # Nota files name should have an only one "_" caracter and weuse multiple with the sameport use  ...sslscan/sslscan2_*.txt* per example 
 write_to_page(){
 page=$1
+
 content=""
 shift
 while [ "$1" != "" ]; do
   for port in $( ls $1 2>/dev/null)
    do 
      portnumber=$(basename $port | cut -d'_' -f2 | cut -d'.' -f 1 )
-     content="$content <span style='font-size: 16pt'><b><span style='color: #ff0000'><br/>Recon for port '$portnumber' :</span></b></span><span style='font-size: 15pt'>"
+     verify_port $portnumber
+     if [ $? -eq 0 ]; then 
+       content="$content <span style='font-size: 16pt'><b><span style='color: #ff0000'><br/>Recon for port '$portnumber' :</span></b></span><span style='font-size: 15pt'>"
+     else
+       content="$content <span style='font-size: 16pt'><b><span style='color: #ff0000'><br/>Nmap cves $portnumber recon scan :</span></b></span><span style='font-size: 15pt'>"
+     fi   
      content="$content <span style='color: #000000'><span style='font-family: Sans'><br><br>$(sed  -e 's/</\&lt;/g'  -e 's/>/\&gt;/g'  -e 's/.*/&<br>/'   $port) <br/></span></span></span><br/>"
    done
   rm -rf $1 
@@ -337,10 +343,32 @@ run_gobuster(){
   fi  
 }
 
-# recon little function 
+# recon little function $mydir $1 $tcp $udp $ports_tcp $ports_udp
 recon_basic(){
 boxe_path=$1
 ip=$2
+# scan for cve with nmap vulners
+if [ -f /usr/share/nmap/scripts/vulners.nse ]; then
+  create_node "$boxe_path/nmapvulners" "Nmap_Cves" "recon node name "
+  if [ $? -ne 2 ]; then
+    echo "\n${YELLOW}[RECON CVE] Enumeration of cves \n${NC}"
+    # tcp ports to scan with cve vulners
+    if [ "$3" -ne 0 ]; then
+      nmap -sV --script vulners --script-args mincvss=7.0 -p $5 -oN ${boxe_path}/nmapvulners/nmapvulners_tcp.txt $ip 
+    fi
+    # udp ports to scan with cve vulners
+    if [ "$4" -ne 0 ]; then
+      nmap -sV --script vulners --script-args mincvss=7.0 -sU -p $6 -oN ${boxe_path}/nmapvulners/nmapvulners_udp.txt $ip  
+    fi  
+    write_to_page ${boxe_path}/nmapvulners/page.html ${boxe_path}/nmapvulners/nmapvulners_*.txt
+  fi
+else
+  echo  "${RED}Please install 'vulners.nse' nmap script:"
+  echo  "${RED}https://github.com/vulnersCom/nmap-vulners"
+  echo  "${RED}"
+  echo  "${RED}Skipping CVE scan!"
+  echo  "${NC}"    
+fi  
 f_oports="$boxe_path/oports.txt"
 gobuster_enable=0
 sslscan_enable=0
@@ -376,7 +404,7 @@ while IFS=: read -r ligne
          continue  
        fi
        if [ $gobuster_enable -eq 0 ]; then
-         create_node "$boxe_path/gobuster" "Gobuster_Recon" "recon node name "
+         create_node "$boxe_path/gobuster" "Gobuster_Recon" "recon node name from gobuster"
          gobuster_enable=$((gobuster_enable+1))
        fi
        reg_usep=".*/$port/.*"
@@ -414,16 +442,17 @@ while IFS=: read -r ligne
       fi
 
       # netbios recon
-      if expr "$ligne" : '.*139/tcp.*' >/dev/null ; then
+      if expr "$ligne" : '^139/tcp.*' >/dev/null ; then
         port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
         verify_port $port
         port_etat=$?
         if [ $port_etat -eq 1 ]; then
           echo "${RED}\n[Warning]: This port '$port' is not correct${NC}"
           continue
-        fi
-        create_node "$boxe_path/netbiosrecon" "Netbios_Recon" "recon node name "
+        fi 
         echo "\n${YELLOW}[RECON Netbios] Running enum4linux enumeration \n${NC}"
+        create_node "$boxe_path/netbiosrecon" "Netbios_Recon" "recon node name "
+        if [ $? -eq 2 ]; then continue; fi
         enum4linux -a $ip 2> /dev/null > ${boxe_path}/netbiosrecon/netbiosrecon_${port}.txt
         write_to_page ${boxe_path}/netbiosrecon/page.html ${boxe_path}/netbiosrecon/netbiosrecon_*.txt
         # verify if we found some users
@@ -435,7 +464,7 @@ while IFS=: read -r ligne
         fi
       fi  
       # smb recon
-      if expr "$ligne" : '.*445/tcp.*' >/dev/null ; then
+      if expr "$ligne" : '^445/tcp.*' >/dev/null ; then
         port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
         verify_port $port
         port_etat=$?
@@ -445,7 +474,9 @@ while IFS=: read -r ligne
         fi
         echo "\n${YELLOW}[RECON SMB] Enumeration of smb server \n${NC}"
         create_node "$boxe_path/smbrecon" "SMB_Recon" "recon node name "
+        if [ $? -eq 2 ]; then continue; fi
         create_node "$boxe_path/smbvulns" "SMB_Vulns" "recon node name "
+        if [ $? -eq 2 ]; then continue; fi
         echo "\$ smbclient -N -L $ip" | tee ${boxe_path}/smbrecon/smbrecon_${port}.txt
         smbclient -N -L $ip >> ${boxe_path}/smbrecon/smbrecon_${port}.txt
         echo "\$ smbmap -H $ip" | tee ${boxe_path}/smbrecon/smbrecon_${port}.txt2
@@ -458,8 +489,12 @@ while IFS=: read -r ligne
             cat ${boxe_path}/smbrecon/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 > ${boxe_path}/smbrecon/users.txt
             for user in $(cat ${boxe_path}/smbrecon/users.txt); do 
               if [ "$(smbmap -u $user  -H $ip | grep 'Authentication error')" =  "" ]; then
-                echo "\$ smbmap -u $user  -H $ip "  >  ${boxe_path}/smbrecon/smbrecon_${port}.txt$user
+                echo "\$ smbmap -u $user  -H $ip "  | tee ${boxe_path}/smbrecon/smbrecon_${port}.txt$user
                 smbmap -u $user -H $ip   >>  ${boxe_path}/smbrecon/smbrecon_${port}.txt$user
+              fi
+              if [ "$(lookupsid.py ${user}@${ip} -no-pass | grep -i 'error')" =  "" ]; then
+                echo "\$ lookupsid.py ${user}@${ip} -no-pass "  >  ${boxe_path}/smbrecon/smbrecon_${port}.txtIPC$user
+                lookupsid.py ${user}@${ip} -no-pass   >>  ${boxe_path}/smbrecon/smbrecon_${port}.txtIPC$user
               fi
             done  
           else
@@ -473,16 +508,17 @@ while IFS=: read -r ligne
       fi
 
       # kerberos recon
-      if expr "$ligne" : '.*88/tcp.*' >/dev/null ; then
+      if expr "$ligne" : '^88/tcp.*' >/dev/null ; then
         port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
         verify_port $port
         port_etat=$?
         if [ $port_etat -eq 1 ]; then
           echo "${RED}\n[Warning]: This port '$port' is not correct${NC}"
           continue
-        fi
-        create_node "$boxe_path/kerberos" "Kerberos_Recon" "recon node name "
+        fi 
         echo "\n${YELLOW}[RECON Kerberos] Kerberos enumeration \n${NC}"
+        create_node "$boxe_path/kerberos" "Kerberos_Recon" "recon node name "
+        if [ $? -eq 2 ]; then continue; fi
         domain="$(cat $f_oports | grep '445/tcp' | grep workgroup | cut -d':' -f2 | cut -d')' -f1)"
         if [ "$domain" = "" ]; then
           domain="$(enum4linux -a $ip 2>/dev/null | grep 'Domain Name'  | cut -d ':' -f 2)"
@@ -491,7 +527,7 @@ while IFS=: read -r ligne
         fi
         ## comand with anonymous user
         target="${domain}/guest"
-        echo "\$ GetNPUsers.py  -dc-ip $ip $target -no-pass"   > ${boxe_path}/kerberos/kerberosrecon_${port}.txt
+        echo "\$ GetNPUsers.py  -dc-ip $ip $target -no-pass"   | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt
         GetNPUsers.py  -dc-ip $ip $target -no-pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt
         if [ "$(cat $f_oports | grep '139/tcp')" != "" ]; then 
           # verify if we found some users
@@ -501,7 +537,7 @@ while IFS=: read -r ligne
             for user in $(cat ${boxe_path}/kerberos/users.txt); do 
               target="${domain}"/$user
               if [ "$(GetNPUsers.py  -dc-ip $ip $target -no-pass | grep 'SessionError')"  = "" ] &&  [ "$(GetNPUsers.py  -dc-ip $ip $target -no-pass | grep 'doesn.t have' )"  = "" ]; then
-                echo "\$ GetNPUsers.py  -dc-ip $ip $target -no-pass"   > ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
+                echo "\$ GetNPUsers.py  -dc-ip $ip $target -no-pass" | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
                 GetNPUsers.py  -dc-ip $ip $target -no-pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
               fi
             done  
@@ -513,7 +549,7 @@ while IFS=: read -r ligne
       fi
 
       # snmp recon
-      if expr "$ligne" : '.*161/udp.*' >/dev/null ; then
+      if expr "$ligne" : '^161/udp.*' >/dev/null ; then
         port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
         verify_port $port
         port_etat=$?
@@ -521,11 +557,30 @@ while IFS=: read -r ligne
           echo "${RED}\n[Warning]: This port '$port' is not correct${NC}"
           continue
         fi
+        echo "\n${YELLOW}[RECON SNMP] Redis server enumeration \n${NC}"
         create_node "$boxe_path/snmprecon" "SNMP_Recon" "recon node name "
+        if [ $? -eq 2 ]; then continue; fi
         snmp-check -t $ip -c public  | tee ${boxe_path}/snmprecon/snmprecon_${port}.txt
         nmap -sV -O --script "snmp-*" -sU  -p 161 $ip -oN ${boxe_path}/snmprecon/snmprecon_${port}.txt2
         write_to_page ${boxe_path}/snmprecon/page.html ${boxe_path}/snmprecon/snmprecon_*.txt*
       fi  
+      # redis recon
+      if expr "$ligne" : '.*redis.*' >/dev/null ; then
+        port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
+        verify_port $port
+        port_etat=$?
+        if [ $port_etat -eq 1 ]; then
+          echo "${RED}\n[Warning]: This port '$port' is not correct${NC}"
+          continue
+        fi
+        echo "\n${YELLOW}[RECON Redis] Redis server enumeration \n${NC}"
+        create_node "$boxe_path/redisrecon" "REDIS_Recon" "recon node name "
+        if [ $? -eq 2 ]; then continue; fi
+        echo "redis-exploit.py  -r $ip -p $port " | tee ${boxe_path}/redisrecon/redisrecon_${port}.txt
+        redis-exploit.py  -r $ip -p $port  >> ${boxe_path}/redisrecon/redisrecon_${port}.txt
+        write_to_page ${boxe_path}/redisrecon/page.html ${boxe_path}/redisrecon/redisrecon_*.txt
+      fi  
+
    done <"$f_oports" 
 rm $f_oports
 # sanitize output for recon folders
@@ -632,8 +687,20 @@ $content
 </body></html>
 EOF
 fi
+# create the readme node
+create_node "$mydir/readme" "Readme" "readme node name "
+if [ $? -ne 2 ]; then
+  cat <<EOF > $mydir/readme/page.html
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"><body>
+<span style='font-size: 16pt'><b><span style='color: #ff0000'>Readme of the box '$title' :</span></b></span>
+<span style='font-size: 15pt'><span style='color: #000000'><span style='font-family: Sans'>
+
+</body></html>
+EOF
+fi  
 if [ "$lrecon" = "l" ]; then
-  recon_basic $mydir $1 
+  recon_basic $mydir $1 $tcp $udp $ports_tcp $ports_udp
 elif [ "$lrecon" = "h" ]; then
    recon_huge $mydir $1
 fi
@@ -1058,22 +1125,22 @@ if [ -f $scanfile ]; then
 fi
 if [ $num_ips -gt 0 ]; then   
    echo "${GREEN}\n$0 successfully scaned $num_ips ip(s)${NC}"
+   if [ "$cmd" = "addto" ] && [ -f "${dir}trash/node.xml" ]; then
+        boxnumbs=$(ls ${dir}*/node.xml | wc -w)
+        sed -i -e 's/.*order.*integer.*/  <key>order<\/key><integer>'$((boxnumbs-1))'<\/integer>/' ${dir}trash/node.xml
+   fi 
    # if script runs with sudo, run the keepnote as the sudo user
    if [ "$SUDO_USER" != "" ]; then
-     if [ "$cmd" = "addto" ] && [ -f "${dir}trash/node.xml" ]; then
-        boxnumbs=$(ls ${dir}*/node.xml | wc -w)
-        sed -i -e 's/.*order.*integer.*/  <key>order<\/key><integer>'$((boxnumbs-1))'<\/integer>/' ${dir}trash/node.xml
-     fi    
      chown -R ${SUDO_USER}:${SUDO_USER} $dir 
-     su -c "keepnote --no-show-errors --newproc --no-default  $dir &" $SUDO_USER && \
-     exit 0
+     if [ -f "${dir}notebook.nbk"  ]; then
+       su -c "keepnote --no-show-errors --no-default  $dir &" $SUDO_USER && \
+       exit 0
+     fi  
    else
-      if [ "$cmd" = "addto" ] && [ -f "${dir}trash/node.xml" ]; then
-        boxnumbs=$(ls ${dir}*/node.xml | wc -w)
-        sed -i -e 's/.*order.*integer.*/  <key>order<\/key><integer>'$((boxnumbs-1))'<\/integer>/' ${dir}trash/node.xml
-      fi 
-      keepnote --no-show-errors --newproc --no-default $dir &
-      exit 0
+      if [ -f "${dir}notebook.nbk"  ]; then
+        keepnote --no-show-errors --no-default $dir &
+        exit 0
+      fi  
    fi
 else
    echo "\n${RED}$0 does not find any valid ip to scan${NC}"
