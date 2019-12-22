@@ -343,11 +343,11 @@ run_gobuster(){
   fi  
 }
 
-# recon little function $mydir $1 $tcp $udp $ports_tcp $ports_udp
+# recon little function $mydir $1 $tcp $udp $ports_tcp $ports_udp $wordlist
 recon_basic(){
 boxe_path=$1
 ip=$2
-wordlist=$7
+wordlist="$7"
 # scan for cve with nmap vulners
 if [ -f /usr/share/nmap/scripts/vulners.nse ]; then
   create_node "$boxe_path/nmapvulners" "Nmap_Cves" "recon node name "
@@ -693,13 +693,17 @@ if [ "$4" = "on" ]; then
     for port in $(cat $mydir/masscan.txt | grep -i open  | grep -i udp |cut  -d " " -f 4 | cut -d "/" -f 1) ; do ports_udp="$port,$ports_udp"  ; done
     ports_udp=$(echo $ports_udp | sed 's/.$//'  )
     #echo "ports scan : $ports_tcp"
-    if [ $(echo $ports_tcp | wc -w)   -ne 0 ]; then
+    if  [ $(echo $ports_tcp | wc -w)   -ne 0 ]; then
        nmap  -sV -sS -p $ports_tcp -T4 -sC  -oN $mydir/nmap.txt  $1
        tcp=1
+    else
+      ports_tcp="-"
     fi
     if [ $(echo $ports_udp | wc -w)   -ne 0 ]; then
        nmap  -sV -sS -sU -p $ports_udp -T4 -sC  -oN $mydir/nmap2.txt  $1
        udp=1
+    else
+      ports_udp="-"
     fi
   else
     echo "${RED}\n[ERROR]: masscan does not find any open port about '$1'. Maybe the host is down${NC}"
@@ -746,6 +750,8 @@ if [ "$lrecon" = "l" ]; then
 elif [ "$lrecon" = "h" ]; then
    recon_basic $mydir $1 $tcp $udp $ports_tcp $ports_udp $big_wordlist
 fi
+# make Readme at the first 
+sed -i -e 's/.*order.*integer.*/  <key>order<\/key><integer>0<\/integer>/' ${mydir}/readme/node.xml
 return 0
 }
 
