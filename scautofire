@@ -874,11 +874,10 @@ usage()
      echo "Create a report scan with a huge scan without Masscan :\n$0 new --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24\n"
   else
      echo "${GREEN}\nUsage:${NC}"
-     echo "\t $0  [command]"
+     echo "\t $0  [command] [Flags]"
      echo "${GREEN}Available Commands:${NC}"
      echo "\t ${YELLOW}new${NC}                     Create a new report scan"
      echo "\t ${YELLOW}addto${NC}                   Add a scan into a report already exists"
-     echo "\t ${YELLOW}help${NC}                    Help about any command"
      echo "\n${GREEN}Flags:${NC}"
      echo "\t -h, --help                   help for $0"
      echo "\t     --type=string            l|h  ['h' for huge scan(all ports) and 'l' for light scan(for commun ports)]           (light by default)"
