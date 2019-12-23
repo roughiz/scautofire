@@ -1,0 +1,15 @@
+keepnote
+nmap
+masscan
+curl
+sslyze
+joomscan 
+wpscan
+droopescan
+gobuste
+smbclient
+smbmap
+enum4linux
+snmp-check
+impacket scripts (used from anywhere)
+redis-exploit.py from https://github.com/roughiz/Redis-Server-Exploit-Enum (install it gloabally)
