@@ -46,7 +46,7 @@ To intsall the script in global mode, use the script like :
 $ sudo ./install_global.sh
 ```
 
-# Script argments Usage: 
+### Script argments Usage: 
 
 ```
 $ scautofire    
@@ -67,7 +67,7 @@ Flags:
 Use 'scautofire [command] --help' for more information about a command.
 ```
 
-# Create a new report usage:
+### Create a new report usage:
 
 ```
 $ scautofire new -h
@@ -112,7 +112,7 @@ Create a report scan with a huge scan without Masscan :
 scautofire new --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
 
 ```
-# Add a scan into an existing report
+### Add a scan into an existing report
 
 ```
 $ scautofire addto -h
