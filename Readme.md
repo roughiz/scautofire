@@ -1,6 +1,6 @@
 # Scanner and discovery
 
-The script makes a discovery scan of network, scan all ips and create a note about it.
+The tool makes a discovery scan of network, scan all ips and create a note about it.
 
 # Create a keepnote report
 
@@ -13,7 +13,7 @@ We can also create just a page for a keepNote report
 ### Functions:
 
 - A very fast port scanner, can scan all udp and tcp port in about 6 min
-- Scan for any Cves about apps or any used services
+- Scan for any Cves about apps or any used servicess
 - Directory and file enumeration about  any http/https server
 - Enumerate for smb authentication 
 - Scan for kerberos authentication and enumerate any exploit aboutit
@@ -34,20 +34,20 @@ masscan and keepnote and many other tools must be installed. See requirements fi
 
 You should open report with KeepNote tool.
 
-To start the script from anywhere you should define the location of the script like :
+To start the tool from anywhere you should define the location of the tool like :
 
 ```
 sudo export KEEPSCAN="/path/to/EnumNeTKeepNoteReportCreator"
 ```
 
 ### Install it in global mode
-To intsall the script in global mode, use the script like :
+To intsall the tool in global mode, use the tool like :
 
 ```
 $ sudo ./install_global.sh
 ```
 
-### Script argments Usage: 
+### Tool argments Usage: 
 
 ```
 $ scautofire    
