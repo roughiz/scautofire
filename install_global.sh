@@ -7,5 +7,6 @@ if [ $(id -u)  -ne 0 ]; then
 fi
 cp ./scautofire /usr/bin/
 
+rm -rf /usr/share/KeepScan 
 ln -s $PWD /usr/share/KeepScan
 
