@@ -1,5 +1,6 @@
 # Scanner and discovery
-the script make a discovery scan of a network, scan all ips and create a note about it.
+
+The script makes a discovery scan of network, scan all ips and create a note about it.
 
 # Create a keepnote report
 
