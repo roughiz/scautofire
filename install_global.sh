@@ -6,7 +6,6 @@ if [ $(id -u)  -ne 0 ]; then
    exit 1
 fi
 cp ./scautofire /usr/bin/
-cp ./create_SemiNoteFromIpWithMasscan.sh /usr/bin/
 
 ln -s $PWD /usr/share/KeepScan
 

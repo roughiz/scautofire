@@ -112,7 +112,7 @@ Create a report scan with a huge scan without Masscan :
 scautofire new --type=h  --masscan=no --name=report-name --path=/path/to/report/destination_directory --cidr=10.10.10.0/24
 
 ```
-# Add a scan into an existing report;
+# Add a scan into an existing report
 
 ```
 $ scautofire addto -h
