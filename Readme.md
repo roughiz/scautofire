@@ -11,13 +11,13 @@ We can also create just a page for a keepNote report
 
 ### Functions:
 
-##### A very fast port scanner, can scan all udp and tcp port in about 6 min
-##### Scan for any Cves about apps or any used services
-##### Directory and file enumeration about  any http/https server
-##### Enumerate for smb authentication 
-##### Scan for kerberos authentication and enumerate any exploit aboutit
-##### Enumerate users etc
-##### Enumerate Redis/SNMP/SSL/CMS  
+##### - A very fast port scanner, can scan all udp and tcp port in about 6 min
+##### - Scan for any Cves about apps or any used services
+##### - Directory and file enumeration about  any http/https server
+##### - Enumerate for smb authentication 
+##### - Scan for kerberos authentication and enumerate any exploit aboutit
+##### - Enumerate users etc
+##### - Enumerate Redis/SNMP/SSL/CMS  
 
 ## Report example:
 
