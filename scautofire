@@ -335,7 +335,7 @@ run_gobuster(){
   else
     extension=".html,.php"
   fi
-  gobuster  dir -w $2 --wildcard -k -l -e -s 200,204,301,302,307,401,405,501,500,502 -x $extension -t 20 -u $1 -o "$4/recon_${5}.txt" 
+  gobuster  dir --timeout 50s -w $2 --wildcard -k -l -e -s 200,204,301,302,307,401,405,501,500,502 -x $extension -t 20 -u $1 -o "$4/recon_${5}.txt" 
   if [ -f  $4/recon_${5}.txt ]; then
     sort $4/recon_${5}.txt | uniq > $4/recon_tmp.txt
     cat $4/recon_tmp.txt > $4/recon_${5}.txt
@@ -469,7 +469,7 @@ while IFS=: read -r ligne
           write_to_page ${boxe_path}/users_enum/page.html  ${boxe_path}/netbiosrecon/enum-users_*.txt  
 
         else
-          rm ${boxe_path}/netbiosrecon/enum-users_${port}.txt
+          rm ${boxe_path}/netbiosrecon/enum-users_139.txt
         fi
       fi  
       # smb recon
