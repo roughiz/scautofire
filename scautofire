@@ -521,7 +521,9 @@ while IFS=: read -r ligne
               fi
             done  
           else
-            rm ${boxe_path}/kerberos/enum-users.txt
+          	if [ -f ${boxe_path}/kerberos/enum-users.txt ];then
+              rm ${boxe_path}/kerberos/enum-users.txt
+            fi  
           fi        
         fi
         
@@ -584,7 +586,9 @@ while IFS=: read -r ligne
               fi
             done  
           else
-            rm ${boxe_path}/kerberos/enum-users.txt
+          	if [ -f ${boxe_path}/kerberos/enum-users.txt ];then
+              rm ${boxe_path}/kerberos/enum-users.txt
+            fi  
           fi        
         fi
         write_to_page $boxe_path/kerberos/page.html $boxe_path/kerberos/kerberosrecon_*.txt*
@@ -674,6 +678,8 @@ fi
 
 # ceate keepnote node
 create_node $mydir $title "box name "
+# if box name exists 
+if [ $? -eq 2 ]; then return 2; fi	
 # masscan 
 udp=0
 tcp=0
