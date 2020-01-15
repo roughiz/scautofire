@@ -335,7 +335,7 @@ run_gobuster(){
   else
     extension=".html,.php"
   fi
-  gobuster  dir --timeout 50s -w $2 --wildcard -k -l -e -s 200,204,301,302,307,401,405,501,500,502 -x $extension -t 20 -u $1 -o "$4/recon_${5}.txt" 
+  gobuster  dir --timeout 50s -w $2 --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -x $extension -t 20 -u $1 -o "$4/recon_${5}.txt" 
   if [ -f  $4/recon_${5}.txt ]; then
     sort $4/recon_${5}.txt | uniq > $4/recon_tmp.txt
     cat $4/recon_tmp.txt > $4/recon_${5}.txt
@@ -610,6 +610,44 @@ while IFS=: read -r ligne
         nmap -sV -O --script "snmp-*" -sU  -p 161 $ip -oN ${boxe_path}/snmprecon/snmprecon_${port}.txt2
         write_to_page ${boxe_path}/snmprecon/page.html ${boxe_path}/snmprecon/snmprecon_*.txt*
       fi  
+      # oracle recon
+      if expr "$ligne" : '^1521/tcp.*' >/dev/null ||  expr "$ligne" : '^1522/tcp.*' >/dev/null ||  expr "$ligne" : '^1529/tcp.*' >/dev/null && expr "$ligne" : '.*oracle-tns.*' >/dev/null ; then
+        port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
+        verify_port $port
+        port_etat=$?
+        if [ $port_etat -eq 1 ]; then
+          echo "${RED}\n[Warning]: This port '$port' is not correct${NC}"
+          continue
+        fi
+        echo "\n${YELLOW}[RECON Oracle] Oracle Db server enumeration \n${NC}"
+        create_node "$boxe_path/oraclerecon" "ORACLE_Recon" "recon node name "
+        # verify odat exists
+        if [ -f  "/usr/share/odat/odat.py" ]; then
+          ODAT="/usr/share/odat"
+          ACCOUNTS="${ODAT}/accounts/accounts_multiple.txt"
+        elif [ -f  "/opt/odat/odat.py" ]; then
+          ODAT="/opt/odat"
+          ACCOUNTS="${ODAT}/accounts/accounts_multiple.txt"
+        else
+          echo "\n${RED}[ERROR] 'odat.py' not found. install 'odat.py' globally in (/opt/ or /usr/share/) \n${NC}"
+          continue
+        fi
+        echo "To see the output in the right form put this command in your terminal like: \n\$ cat ${boxe_path}/oraclerecon/output_oraclerecon.txt \n" > ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
+        echo "hydra -L ${ODAT}/sids.txt -s $port  $ip  oracle-sid" | tee -a ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
+        hydra -L ${ODAT}/sids.txt -s $port  $ip  oracle-sid >> ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
+        sids="$(cat ${boxe_path}/oraclerecon/oraclerecon_${port}.txt | grep -i ".*oracle-sid.*login:" | cut -d':' -f3)"
+        if [ "$sids" != " " ]  && [ "$sids" != "" ]; then
+          for sid in $sids; do
+          	echo "" >> ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
+            echo "odat.py passwordguesser  -s $ip -p $port -d $sid --accounts-file $ACCOUNTS" | tee -a  ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
+            echo -e "c\n" | python3 ${ODAT}/odat.py passwordguesser -s $ip -p $port -d $sid --accounts-file $ACCOUNTS >> ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
+       	  done
+       	else
+       	  echo "${RED}\n[Oracle ]: No sid found in the Db server${NC}"
+       	fi  
+       	cp ${boxe_path}/oraclerecon/oraclerecon_${port}.txt  ${boxe_path}/oraclerecon/output_oraclerecon.txt
+        write_to_page ${boxe_path}/oraclerecon/page.html ${boxe_path}/oraclerecon/oraclerecon_*.txt
+      fi   
       # redis recon
       if expr "$ligne" : '.*redis.*' >/dev/null ; then
         port=$(echo $ligne  | sed 's/  */ /g' | cut -d' ' -f1 | cut -d'/'  -f1)
@@ -1077,7 +1115,8 @@ if [ $(id -u)  -ne 0 ]; then
         echo "${YELLOW}This script must be run as root, use sudo "$0" instead\n" 1>&2
         exit 1
 fi
-
+# go to /tmp directory
+cd /tmp
 if [ "$cmd" = "new" ]; then 
    dir="$rootDir$name/"
    scanfile="${dir}scan.txt"
