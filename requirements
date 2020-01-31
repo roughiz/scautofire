@@ -13,3 +13,5 @@ enum4linux
 snmp-check
 impacket scripts (used from anywhere)
 redis-exploit.py from https://github.com/roughiz/Redis-Server-Exploit-Enum (install it gloabally)
+ssltest.py from https://github.com/Lekensteyn/pacemaker (install it globally)
+

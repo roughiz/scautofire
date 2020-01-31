@@ -335,12 +335,23 @@ run_gobuster(){
   else
     extension=".html,.php"
   fi
-  gobuster  dir --timeout 50s -w $2 --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -x $extension -t 20 -u $1 -o "$4/recon_${5}.txt" 
+  gobuster  dir --useragent "roughiz" --timeout 50s -w $2 --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -x $extension -t 20 -u $1 -o "$4/recon_${5}.txt" 
   if [ -f  $4/recon_${5}.txt ]; then
     sort $4/recon_${5}.txt | uniq > $4/recon_tmp.txt
     cat $4/recon_tmp.txt > $4/recon_${5}.txt
     rm $4/recon_tmp.txt
-  fi  
+    echo "\$ gobuster  dir --useragent 'roughiz' --timeout 50s -w $2 --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -x $extension -t 20 -u $1 \n\n$(cat $4/recon_${5}.txt)" > $4/recon_${5}.txt
+  fi
+  ## enumerate tomcat server using specific wordlist
+  if [ "$(echo "$3" | grep -i "Tomcat")" != "" ]; then
+  	echo "\n${YELLOW}[RECON Tomcat server] Running gobuster for the url: $url \n${NC}"
+    echo "\n\n\$ gobuster  dir --useragent "roughiz" --timeout 50s -w $tomcat_wordlist --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -t 20 -u $1\n" | tee -a $4/recon_${5}.txt
+    gobuster  dir --useragent "roughiz" --timeout 50s -w $tomcat_wordlist --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -t 20 -u $1 -o $4/recon_tmp.txt
+    if [ -f  $4/recon_tmp.txt ]; then
+      cat $4/recon_tmp.txt >> $4/recon_${5}.txt
+      rm $4/recon_tmp.txt 
+    fi
+  fi	
 }
 
 # recon little function $mydir $1 $tcp $udp $ports_tcp $ports_udp $wordlist
@@ -420,6 +431,8 @@ while IFS=: read -r ligne
           echo "\n${YELLOW}[RECON SSL/TLS] Discover supported cipher suites for the url: $url \n${NC}"
           echo "\$ sslyze --regular $ip:$port" | tee ${boxe_path}/sslscan/sslscan_${port}.txt
           sslyze --regular $ip:$port >> ${boxe_path}/sslscan/sslscan_${port}.txt
+          echo "\n\$ ssltest.py -p $port $ip  \n" >> ${boxe_path}/sslscan/sslscan_${port}.txt
+          ssltest.py -p $port $ip >> ${boxe_path}/sslscan/sslscan_${port}.txt
         else
           curl -v -k --max-time 10 https://$ip:$port/ 2> /dev/null 1> /dev/null
           if [ $? -eq 0 ]; then
@@ -431,6 +444,8 @@ while IFS=: read -r ligne
             echo "\n${YELLOW}[RECON SSL/TLS] Discover supported cipher suites for the url: $url \n${NC}"
             echo "\$ sslyze --regular $ip:$port" | tee ${boxe_path}/sslscan/sslscan_${port}.txt
             sslyze --regular $ip:$port >> ${boxe_path}/sslscan/sslscan_${port}.txt
+            echo "\n\$ ssltest.py -p $port $ip  \n" >> ${boxe_path}/sslscan/sslscan_${port}.txt
+            ssltest.py -p $port $ip >> ${boxe_path}/sslscan/sslscan_${port}.txt
           else
             url="http://$ip:$port"
           fi
@@ -440,6 +455,7 @@ while IFS=: read -r ligne
        fi  
        echo "\n${YELLOW}[RECON Http/Https] Running gobuster for the url: $url \n${NC}"
        run_gobuster $url $wordlist "$ligne" "$boxe_path/gobuster" $port
+
       fi
 
       # netbios recon
@@ -633,13 +649,13 @@ while IFS=: read -r ligne
           continue
         fi
         echo "To see the output in the right form put this command in your terminal like: \n\$ cat ${boxe_path}/oraclerecon/output_oraclerecon.txt \n" > ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
-        echo "hydra -L ${ODAT}/sids.txt -s $port  $ip  oracle-sid" | tee -a ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
+        echo "\$ hydra -L ${ODAT}/sids.txt -s $port  $ip  oracle-sid" | tee -a ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
         hydra -L ${ODAT}/sids.txt -s $port  $ip  oracle-sid >> ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
         sids="$(cat ${boxe_path}/oraclerecon/oraclerecon_${port}.txt | grep -i ".*oracle-sid.*login:" | cut -d':' -f3)"
         if [ "$sids" != " " ]  && [ "$sids" != "" ]; then
           for sid in $sids; do
           	echo "" >> ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
-            echo "odat.py passwordguesser  -s $ip -p $port -d $sid --accounts-file $ACCOUNTS" | tee -a  ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
+            echo "\$ odat.py passwordguesser  -s $ip -p $port -d $sid --accounts-file $ACCOUNTS" | tee -a  ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
             echo -e "c\n" | python3 ${ODAT}/odat.py passwordguesser -s $ip -p $port -d $sid --accounts-file $ACCOUNTS >> ${boxe_path}/oraclerecon/oraclerecon_${port}.txt
        	  done
        	else
@@ -660,7 +676,7 @@ while IFS=: read -r ligne
         echo "\n${YELLOW}[RECON Redis] Redis server enumeration \n${NC}"
         create_node "$boxe_path/redisrecon" "REDIS_Recon" "recon node name "
         if [ $? -eq 2 ]; then continue; fi
-        echo "redis-exploit.py  -r $ip -p $port " | tee ${boxe_path}/redisrecon/redisrecon_${port}.txt
+        echo "\$ redis-exploit.py  -r $ip -p $port " | tee ${boxe_path}/redisrecon/redisrecon_${port}.txt
         redis-exploit.py  -r $ip -p $port  >> ${boxe_path}/redisrecon/redisrecon_${port}.txt
         write_to_page ${boxe_path}/redisrecon/page.html ${boxe_path}/redisrecon/redisrecon_*.txt
       fi  
@@ -686,10 +702,10 @@ if [ "$cms"  != "" ]; then
     for line in $cms; do
       port=`cat $boxe_path/nmap*.txt | grep $line -B1 | grep -w "open" | cut -d "/" -f 1`
       case "$line" in
-        *Joomla!*) joomscan --url $ip:$port 1> ${boxe_path}/cms/joomlascan_${port}.txt && cms_enable=$((cms_enable+1));;
-        *WordPress*) echo -e "\n" | wpscan --url $ip:$port --enumerate p | tee ${boxe_path}/cms/wpscan_${port}.txt && cms_enable=$((cms_enable+1));;
-        *Drupal*) droopescan scan drupal -u $ip:$port | tee ${boxe_path}/cms/drupalscan_${port}.txt && cms_enable=$((cms_enable+1));;
-        *SharePoint*) gobuster  dir -w $sharepoint_wordlist --wildcard -k -l -e -s 200,204,301,302,307,401,403,405,501,500,502  -t 30 -u http://$1 -o "${boxe_path}/cms/sharepointscan_${port}.txt" && cms_enable=$((cms_enable+1));;
+        *Joomla!*) echo "\n\$ joomscan --url $ip:$port\n" | tee ${boxe_path}/cms/joomlascan_${port}.txt &&  joomscan --url $ip:$port 1>> ${boxe_path}/cms/joomlascan_${port}.txt && cms_enable=$((cms_enable+1));;
+        *WordPress*) echo "\n\$ wpscan --url $ip:$port --enumerate p\n" > ${boxe_path}/cms/wpscan_${port}.txt && echo -e "\n" | wpscan --url $ip:$port --enumerate p | tee -a ${boxe_path}/cms/wpscan_${port}.txt && cms_enable=$((cms_enable+1));;
+        *Drupal*) echo "\n\$ droopescan scan drupal -u $ip:$port\n" > ${boxe_path}/cms/drupalscan_${port}.txt && droopescan scan drupal -u $ip:$port | tee -a ${boxe_path}/cms/drupalscan_${port}.txt && cms_enable=$((cms_enable+1));;
+        *SharePoint*) echo "\n\$ gobuster  dir -w $sharepoint_wordlist --wildcard -k -l -e -s 200,204,301,302,307,401,403,405,501,500,502  -t 30 -u http://$1\n" > ${boxe_path}/cms/sharepointscan_${port}.txt && gobuster  dir -w $sharepoint_wordlist --wildcard -k -l -e -s 200,204,301,302,307,401,403,405,501,500,502  -t 30 -u http://$1 | tee -a ${boxe_path}/cms/sharepointscan_${port}.txt && cms_enable=$((cms_enable+1));;
       esac
     done
 fi
@@ -961,12 +977,14 @@ if [ "$gks" = "" ];then
     KEEPSCAN="/usr/share/KeepScan"
     common_wordlist="${KEEPSCAN}/wordlist/common.txt"
     big_wordlist="${KEEPSCAN}/wordlist/big.txt"
+    tomcat_wordlist="${KEEPSCAN}/wordlist/tomcat.txt"
     sharepoint_wordlist="${KEEPSCAN}/wordlist/sharepoint.txt"
   else
     if [ -d "./template" ]; then 
       KEEPSCAN="."
       common_wordlist="./wordlist/common.txt"
       big_wordlist="./wordlist/big.txt"
+      tomcat_wordlist="./wordlist/tomcat.txt"
       sharepoint_wordlist="./wordlist/sharepoint.txt"
     else
       print "You should be in the KeepScan directory, or install it globally !!"
