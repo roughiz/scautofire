@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/zsh
 # create the keepNote directory functions
 
 hash_gen(){
@@ -514,8 +514,8 @@ while IFS=: read -r ligne
         if [ $? -eq 2 ]; then continue; fi
         echo "\$ smbclient -N -L $ip" | tee ${boxe_path}/smbrecon/smbrecon_${port}.txt
         smbclient -N -L $ip >> ${boxe_path}/smbrecon/smbrecon_${port}.txt
-        echo "\$ smbmap -H $ip" | tee ${boxe_path}/smbrecon/smbrecon_${port}.txt2
-        smbmap -H $ip >> ${boxe_path}/smbrecon/smbrecon_${port}.txt2
+        echo "\$ smbmap -H $ip -u 'anonymous' " | tee ${boxe_path}/smbrecon/smbrecon_${port}.txt2
+        smbmap -H $ip -u 'anonymous' >> ${boxe_path}/smbrecon/smbrecon_${port}.txt2
         # smb enum with other users if foundedwith enum4linu
         if [ "$(cat $f_oports | grep '139/tcp')" != "" ]; then 
           # verify if we found some users
@@ -654,7 +654,7 @@ while IFS=: read -r ligne
           echo "${RED}\n[Warning]: This port '$port' is not correct${NC}"
           continue
         fi
-        echo "\n${YELLOW}[RECON SNMP] Redis server enumeration \n${NC}"
+        echo "\n${YELLOW}[RECON SNMP] SNMP server enumeration \n${NC}"
         create_node "$boxe_path/snmprecon" "SNMP_Recon" "recon node name "
         if [ $? -eq 2 ]; then continue; fi
         snmp-check -t $ip -c public  | tee ${boxe_path}/snmprecon/snmprecon_${port}.txt
