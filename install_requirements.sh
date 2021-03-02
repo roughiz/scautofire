@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # color define
 RED='\033[0;31m'
@@ -8,7 +8,8 @@ NC='\033[0m'
 
 usage(){
 	 echo -e "${GREEN}\nUsage:${NC}"
-     echo -e "\t $0  /path/to/instalation/directory "
+         echo -e "\t $0  /path/to/instalation/directory 'any env paramters to use with the script'"
+         echo -e "\t $0  /path/to/instalation/directory proxy=http://127.0.0.1 "
 }
 
 #Verify if script run as root
@@ -18,8 +19,9 @@ if [ $(id -u)  -ne 0 ]; then
 fi
 
 # verify the command 
-if [ ${#} -ne 1 ]; then
-   echo -e "${RED}\n[ERROR]: This script take one argument !!${NC}\n"
+if [ ${#} -lt 1 ]; then
+   echo -e "${RED}\n[ERROR]: This script take at least one argument !!${NC}\n"
+    . ~/.bashrc
     usage 
     exit 1
 elif [ -d "$1" ]; then
@@ -28,8 +30,10 @@ elif [ -d "$1" ]; then
         rootDir=$VALUE
     else
         rootDir="$VALUE/"
-    fi  
-
+    fi 
+    if [ ! -z "$2" ]; then
+       env_cmd="export $2"
+    fi
 else
     echo -e "${RED}\n[ERROR]: the path \"$1\" is not a directory !!${NC}\n"
     usage 
@@ -41,7 +45,11 @@ execute_as_sudo_user(){
   # if script runs with sudo
   if [ "$SUDO_USER" != "" ]; then
    	 # execute commmand as the sudo user 
-     su -c "$cur_cmd" $SUDO_USER 
+     if [ ! -z "$env_cmd" ]; then
+        su -c "$env_cmd && $cur_cmd" $SUDO_USER
+     else
+        su -c "$cur_cmd" $SUDO_USER
+     fi
   else
     $cur_cmd
   fi
@@ -55,8 +63,20 @@ command_exists(){
   fi
 }
 
+# set env vars if exists
+if [ ! -z "$env_cmd" ]; then
+  $env_cmd
+fi
+
 #Update apt sources list:
 apt update
+
+#Read env vars
+if [ -f ~/.zshrc ]; then
+   . ~/.zshrc
+elif [ -f ~/.bashrc ]; then
+   . ~/.bashrc
+fi
 
 # Install keepnote
 command_exists "keepnote"
@@ -101,7 +121,7 @@ if [ $? -ne 0 ]; then
 fi
 
 #Install requirements
-apt-get install git gcc make libpcap-dev
+apt-get install -y git gcc make libpcap-dev
 
 #Install masscan
 command_exists "masscan"
@@ -116,15 +136,14 @@ fi
 
 # install pip
 apt install -y python-pip python3-venv python3-pip && \
-pip install -y setuptools
+pip install setuptools
 
 #Install sslyze
 command_exists "sslyze"
 if [ $? -ne 0 ]; then
 	echo -e "${GREEN}\nInsall sslyze${NC}"
-	execute_as_sudo_user "git clone https://github.com/nabla-c0d3/sslyze.git ${rootDir}sslyze" 
-	cd ${rootDir}sslyze
-	pip install .
+        pip install --upgrade setuptools
+        pip install sslyze
 fi
 
 #Install ssltest.py
@@ -149,7 +168,7 @@ if [ $? -ne 0 ]; then
 	echo -e "${GREEN}\nInsall wpscan${NC}"
 	apt install -y ruby && \
 	apt install -y build-essential libcurl4-openssl-dev libxml2 libxml2-dev libxslt1-dev ruby-dev  libgmp-dev zlib1g-dev && \
-	gem install -y wpscan
+	gem install  wpscan
 fi
 
 #Install droopescan
@@ -163,16 +182,15 @@ fi
 #Install gobuster
 command_exists "gobuster"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall gobuster${NC}"
-	command_exists "go"
+    echo -e "${GREEN}\nInsall gobuster${NC}"
+    command_exists "go"
     if [ $? -ne 0 ]; then
-      curl -SL  https://golang.org/dl/go1.15.4.linux-amd64.tar.gz -o /tmp/go1.15.4.linux-amd64.tar.gz && \
-      tar -C /usr/local -xzf /tmp/go1.15.4.linux-amd64.tar.gz && \
-      rm -rf /tmp/go1.15.4.linux-amd64.tar.gz && \
+      curl -SL  https://golang.org/dl/go1.16.linux-amd64.tar.gz -o /tmp/go1.16.linux-amd64.tar.gz && \
+      tar -C /usr/local -xzf /tmp/go1.16.linux-amd64.tar.gz && \
+      rm -rf /tmp/go1.16.linux-amd64.tar.gz && \
       execute_as_sudo_user 'echo "export PATH=$PATH:/usr/local/go/bin" >> ~/.profile' 
-      
     fi  
-    execute_as_sudo_user "git clone https://github.com/OJ/gobuster.git ${rootDir}gobuster && cd ${rootDir}gobuster && source ~/.profile && go get && go build"
+    execute_as_sudo_user "git clone https://github.com/OJ/gobuster.git ${rootDir}gobuster && cd ${rootDir}gobuster && export PATH='$PATH:/usr/local/go/bin' && go get && go build"
     ln -s  ${rootDir}gobuster/gobuster /usr/bin/gobuster
 fi
 
@@ -185,10 +203,10 @@ if [ $? -ne 0 ]; then
 	ln -s  ${rootDir}smbmap/smbmap.py /usr/local/bin/smbmap
 fi
 
-#Install enum4inux
-command_exists "enum4inux"
+#Install enum4linux
+command_exists "enum4linux"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall enum4inux${NC}"
+	echo -e "${GREEN}\nInsall enum4linux${NC}"
     execute_as_sudo_user "git clone https://github.com/CiscoCXSecurity/enum4linux.git ${rootDir}enum4linux" 
 	ln -s  ${rootDir}enum4linux/enum4linux.pl /usr/local/bin/enum4linux
 fi
@@ -197,7 +215,7 @@ fi
 command_exists "hydra"
 if [ $? -ne 0 ]; then
 	echo -e "${GREEN}\nInsall hydra${NC}"
-	# Install depencies
+	# Install depenciesrootDir
 	apt-get install -y libssl-dev libssh-dev libidn11-dev libpcre3-dev libgtk2.0-dev libmysqlclient-dev libpq-dev libsvn-dev && \
     apt-get install -y  firebird-dev libmemcached-dev libgpg-error-dev libgcrypt11-dev libgcrypt20-dev
     execute_as_sudo_user "git clone https://github.com/vanhauser-thc/thc-hydra.git ${rootDir}thc-hydra" 
@@ -217,12 +235,15 @@ fi
 command_exists "redis-exploit.py"
 if [ $? -ne 0 ]; then
 	echo -e "${GREEN}\nInsall redis-exploit.py${NC}"
-    execute_as_sudo_user "git clone https://github.com/roughiz/Redis-Server-Exploit-Enum.git ${rootDir}Redis-Server-Exploit-Enum" 
+    execute_as_sudo_user "git clone https://github.com/roughiz/Redis-Server-Exploit-Enum.git ${rootDir}Redis-Server-Exploit-Enum && chmod +x ${rootDir}Redis-Server-Exploit-Enum/redis-exploit.py && cd ${rootDir}Redis-Server-Exploit-Enum && pip install -r requirements.txt" 
     ln -s  ${rootDir}Redis-Server-Exploit-Enum/redis-exploit.py /usr/local/bin/redis-exploit.py
 fi
 
 #Install wfuzz
-command_exists "redis-exploit.py"
+command_exists "wfuzz"
 if [ $? -ne 0 ]; then
-   pip install wfuzz
+    echo -e "${GREEN}\nInsall wfuzz${NC}"
+    execute_as_sudo_user "curl -SL  https://github.com/xmendez/wfuzz/archive/v3.1.0.tar.gz -o /tmp/v3.1.0.tar.gz && tar -C ${rootDir} -xzf /tmp/v3.1.0.tar.gz && rm -rf /tmp/v3.1.0.tar.gz && mv ${rootDir}wfuzz-3.1.0 ${rootDir}wfuzz"
+    cd ${rootDir}wfuzz && pip3 install .
 fi
+
