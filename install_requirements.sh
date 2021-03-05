@@ -86,6 +86,16 @@ if [ $? -ne 0 ]; then
 	apt-get install -y keepnote
 fi
 
+## Install nmap scripts
+nmap_script="/usr/share/nmap/scripts"
+if [ -d "$nmap_script" ]; then
+  git clone https://github.com/vulnersCom/nmap-vulners.git /tmp/nmap-vulners
+  cp -r /tmp/nmap-vulners/*.nse ${nmap_script}/
+  nmap --script-updatedb
+else
+  echo -e "${RED}\n[ERROR]: the path \"$nmap_script\" is not found, find the nmap scripts emplacement !!${NC}\n"
+fi
+
 # Install nmap
 command_exists "nmap"
 if [ $? -ne 0 ]; then
@@ -190,7 +200,7 @@ if [ $? -ne 0 ]; then
       rm -rf /tmp/go1.16.linux-amd64.tar.gz && \
       execute_as_sudo_user 'echo "export PATH=$PATH:/usr/local/go/bin" >> ~/.profile' 
     fi  
-    execute_as_sudo_user "git clone https://github.com/OJ/gobuster.git ${rootDir}gobuster && cd ${rootDir}gobuster && export PATH='$PATH:/usr/local/go/bin' && go get && go build"
+    execute_as_sudo_user "curl -SL https://github.com/OJ/gobuster/archive/v3.0.1.tar.gz -o /tmp/v3.0.1.tar.gz && tar -C ${rootDir} -xzf /tmp/v3.0.1.tar.gz && rm -rf /tmp/v3.0.1.tar.gz && mv ${rootDir}gobuster-3.0.1 ${rootDir}gobuster && cd ${rootDir}gobuster && export PATH='$PATH:/usr/local/go/bin' && go get && go build"
     ln -s  ${rootDir}gobuster/gobuster /usr/bin/gobuster
 fi
 

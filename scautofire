@@ -1278,7 +1278,8 @@ if [ $num_ips -gt 0 ]; then
    fi 
    # if script runs with sudo, run the keepnote as the sudo user
    if [ "$SUDO_USER" != "" ]; then
-     chown -R ${SUDO_USER}:${SUDO_USER} $dir 
+     #chown -R ${SUDO_USER}:${SUDO_USER} $dir 
+     chown -R ${SUDO_USER} $dir 
      if [ -f "${dir}notebook.nbk"  ]; then
        su -c "keepnote --no-show-errors --no-default  $dir &" $SUDO_USER && \
        exit 0
