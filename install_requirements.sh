@@ -5,6 +5,7 @@ RED='\033[0;31m'
 YELLOW='\033[0;33m'
 GREEN='\033[0;32m'
 NC='\033[0m'
+curd="$PWD"
 
 usage(){
 	 echo -e "${GREEN}\nUsage:${NC}"
@@ -78,20 +79,32 @@ elif [ -f ~/.bashrc ]; then
    . ~/.bashrc
 fi
 
+# install pip, alien 
+apt install -y python-pip python3-venv python3-pip libaio1 python3-dev alien && \
+pip install setuptools
+
+# Install some python lib
+apt-get install -y python3-scapy && \
+pip3 install  colorlog termcolor pycrypto passlib && \
+pip3 install argcomplete && activate-global-python-argcomplete && \
+pip3 install pyinstaller
+
 # Install keepnote
 command_exists "keepnote"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall keepnote${NC}"
+	echo -e "${GREEN}\nInstall keepnote${NC}"
 	apt-get install -y  python python-gtk2 python-glade2 libgtk2.0-dev libsqlite3-0 && \
 	apt-get install -y keepnote
 fi
 
 ## Install nmap scripts
-nmap_script="/usr/share/nmap/scripts"
-if [ -d "$nmap_script" ]; then
-  git clone https://github.com/vulnersCom/nmap-vulners.git /tmp/nmap-vulners
-  cp -r /tmp/nmap-vulners/*.nse ${nmap_script}/
-  nmap --script-updatedb
+nmap_script="/usr/share/nmap/scripts/"
+if [  -d "$nmap_script" ]; then
+  if [ ! -f "${nmap_script}vulners.nse" ]; then
+    git clone https://github.com/vulnersCom/nmap-vulners.git /tmp/nmap-vulners
+    cp -r /tmp/nmap-vulners/*.nse ${nmap_script}/
+    nmap --script-updatedb
+  fi
 else
   echo -e "${RED}\n[ERROR]: the path \"$nmap_script\" is not found, find the nmap scripts emplacement !!${NC}\n"
 fi
@@ -99,7 +112,7 @@ fi
 # Install nmap
 command_exists "nmap"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall nmap${NC}"
+	echo -e "${GREEN}\nInstall nmap${NC}"
 	apt-get install -y nmap
 	execute_as_sudo_user "git clone https://github.com/vulnersCom/nmap-vulners.git ${rootDir}nmap-vulners"
 	cp ${rootDir}nmap-vulners/vulners.nse /usr/share/nmap/scripts/ && \
@@ -109,14 +122,14 @@ fi
 #Install curl
 command_exists "curl"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall curl${NC}"
+	echo -e "${GREEN}\nInstall curl${NC}"
 	apt-get install -y curl
 fi
 
 #Install smbclient
 command_exists "smbclient"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall smbclient${NC}"
+	echo -e "${GREEN}\nInstall smbclient${NC}"
 	apt-get install -y smbclient
 fi
 
@@ -124,7 +137,7 @@ fi
 #Install snmpwalk
 command_exists "snmpwalk"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall snmpwalk${NC}"
+	echo -e "${GREEN}\nInstall snmpwalk${NC}"
 	apt-get install -y snmp libsnmp-dev && \
 	apt-get install -y snmp-mibs-downloader && \
 	sed  -i "s/^mibs :$/#mibs :/g" /etc/snmp/snmp.conf
@@ -136,22 +149,17 @@ apt-get install -y git gcc make libpcap-dev
 #Install masscan
 command_exists "masscan"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall masscan${NC}"
+	echo -e "${GREEN}\nInstall masscan${NC}"
 	execute_as_sudo_user "git clone https://github.com/robertdavidgraham/masscan ${rootDir}masscan" 
 	execute_as_sudo_user "cd ${rootDir}masscan && make -j"
 	cd ${rootDir}masscan
 	make install
 fi
 
-
-# install pip
-apt install -y python-pip python3-venv python3-pip && \
-pip install setuptools
-
 #Install sslyze
 command_exists "sslyze"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall sslyze${NC}"
+	echo -e "${GREEN}\nInstall sslyze${NC}"
         pip install --upgrade setuptools
         pip install sslyze
 fi
@@ -159,7 +167,7 @@ fi
 #Install ssltest.py
 command_exists "ssltest.py"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall ssltest${NC}"
+	echo -e "${GREEN}\nInstall ssltest${NC}"
 	execute_as_sudo_user "git clone https://github.com/Lekensteyn/pacemaker.git ${rootDir}pacemaker" 
 	ln -s  ${rootDir}pacemaker/ssltest.py /usr/bin/ssltest.py
 fi
@@ -167,7 +175,7 @@ fi
 #Install joomscan
 command_exists "joomscan"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall joomscan${NC}"
+	echo -e "${GREEN}\nInstall joomscan${NC}"
 	execute_as_sudo_user "git clone https://github.com/rezasp/joomscan.git ${rootDir}joomscan" 
 	ln -s  ${rootDir}joomscan/joomscan.pl /usr/local/bin/joomscan
 fi
@@ -175,7 +183,7 @@ fi
 #Install wpscan
 command_exists "wpscan"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall wpscan${NC}"
+	echo -e "${GREEN}\nInstall wpscan${NC}"
 	apt install -y ruby && \
 	apt install -y build-essential libcurl4-openssl-dev libxml2 libxml2-dev libxslt1-dev ruby-dev  libgmp-dev zlib1g-dev && \
 	gem install  wpscan
@@ -184,7 +192,7 @@ fi
 #Install droopescan
 command_exists "droopescan"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall droopescan${NC}"
+	echo -e "${GREEN}\nInstall droopescan${NC}"
 	apt-get install -y python-pip && \
 	pip install droopescan
 fi
@@ -192,7 +200,7 @@ fi
 #Install gobuster
 command_exists "gobuster"
 if [ $? -ne 0 ]; then
-    echo -e "${GREEN}\nInsall gobuster${NC}"
+    echo -e "${GREEN}\nInstall gobuster${NC}"
     command_exists "go"
     if [ $? -ne 0 ]; then
       curl -SL  https://golang.org/dl/go1.16.linux-amd64.tar.gz -o /tmp/go1.16.linux-amd64.tar.gz && \
@@ -207,7 +215,7 @@ fi
 #Install smbmap
 command_exists "smbmap"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall smbmap${NC}"
+	echo -e "${GREEN}\nInstall smbmap${NC}"
     execute_as_sudo_user "git clone https://github.com/ShawnDEvans/smbmap.git ${rootDir}smbmap" 
     cd ${rootDir}smbmap && python3 -m pip install -r requirements.txt
 	ln -s  ${rootDir}smbmap/smbmap.py /usr/local/bin/smbmap
@@ -216,7 +224,7 @@ fi
 #Install enum4linux
 command_exists "enum4linux"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall enum4linux${NC}"
+	echo -e "${GREEN}\nInstall enum4linux${NC}"
     execute_as_sudo_user "git clone https://github.com/CiscoCXSecurity/enum4linux.git ${rootDir}enum4linux" 
 	ln -s  ${rootDir}enum4linux/enum4linux.pl /usr/local/bin/enum4linux
 fi
@@ -224,7 +232,7 @@ fi
 #Install hydra
 command_exists "hydra"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall hydra${NC}"
+	echo -e "${GREEN}\nInstall hydra${NC}"
 	# Install depenciesrootDir
 	apt-get install -y libssl-dev libssh-dev libidn11-dev libpcre3-dev libgtk2.0-dev libmysqlclient-dev libpq-dev libsvn-dev && \
     apt-get install -y  firebird-dev libmemcached-dev libgpg-error-dev libgcrypt11-dev libgcrypt20-dev
@@ -236,7 +244,7 @@ fi
 #Install Impacket
 command_exists "lookupsid.py"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall Impacket${NC}"
+	echo -e "${GREEN}\nInstall Impacket${NC}"
     execute_as_sudo_user "git clone https://github.com/SecureAuthCorp/impacket.git ${rootDir}impacket" 
     cd  ${rootDir}impacket && pip3 install .
 fi
@@ -244,7 +252,7 @@ fi
 #Install Redis
 command_exists "redis-exploit.py"
 if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInsall redis-exploit.py${NC}"
+	echo -e "${GREEN}\nInstall redis-exploit.py${NC}"
     execute_as_sudo_user "git clone https://github.com/roughiz/Redis-Server-Exploit-Enum.git ${rootDir}Redis-Server-Exploit-Enum && chmod +x ${rootDir}Redis-Server-Exploit-Enum/redis-exploit.py && cd ${rootDir}Redis-Server-Exploit-Enum && pip install -r requirements.txt" 
     ln -s  ${rootDir}Redis-Server-Exploit-Enum/redis-exploit.py /usr/local/bin/redis-exploit.py
 fi
@@ -252,8 +260,40 @@ fi
 #Install wfuzz
 command_exists "wfuzz"
 if [ $? -ne 0 ]; then
-    echo -e "${GREEN}\nInsall wfuzz${NC}"
+    echo -e "${GREEN}\nInstall wfuzz${NC}"
     execute_as_sudo_user "curl -SL  https://github.com/xmendez/wfuzz/archive/v3.1.0.tar.gz -o /tmp/v3.1.0.tar.gz && tar -C ${rootDir} -xzf /tmp/v3.1.0.tar.gz && rm -rf /tmp/v3.1.0.tar.gz && mv ${rootDir}wfuzz-3.1.0 ${rootDir}wfuzz"
     cd ${rootDir}wfuzz && pip3 install .
+fi
+
+#Install odat.py
+command_exists "odat.py"
+if [ $? -ne 0 ]; then
+    echo -e "${GREEN}\nInstall odat.py${NC}"
+    destination="/usr/share/odat"
+    if [ -d "$destination" ];then rm -rf $destination;fi
+    git clone https://github.com/quentinhardy/odat.git $destination && \
+    cd $curd && cp -r wordlist/oracle/accounts_multiple_lower.txt wordlist/oracle/heavy*txt ${destination}/accounts/ && \
+    cp wordlist/oracle/sids.txt ${destination}/ && \
+    cd $destination && \
+    git submodule init && \
+    git submodule update && \
+    mkdir /tmp/odat_rpm  
+    if [ ! $(dpkg -l | grep -i oracle-instantclient | wc -l) -ge 3 ];then
+      curl -SL https://download.oracle.com/otn_software/linux/instantclient/211000/oracle-instantclient-basic-21.1.0.0.0-1.x86_64.rpm -o /tmp/odat_rpm/oracle-instantclient-basic.rpm && \
+      curl -SL https://download.oracle.com/otn_software/linux/instantclient/211000/oracle-instantclient-tools-21.1.0.0.0-1.x86_64.rpm -o /tmp/odat_rpm/oracle-instantclient-tools.rpm && \
+      curl -SL https://download.oracle.com/otn_software/linux/instantclient/211000/oracle-instantclient-devel-21.1.0.0.0-1.x86_64.rpm -o /tmp/odat_rpm/oracle-instantclient-devel.rpm && \
+      cd /tmp/odat_rpm/ && alien --to-deb *.rpm && \
+      dpkg -i *.deb 
+    fi
+   version=$(dir /usr/lib/oracle/) && \
+   echo "export ORACLE_HOME=/usr/lib/oracle/${version}/client64/" >> /etc/profile && \
+   echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$ORACLE_HOME/lib" >> /etc/profile  && \
+   echo "export PATH=\${ORACLE_HOME}bin:\$PATH" >> /etc/profile  && \
+   echo "/usr/lib/oracle/${version}/client64/lib/" >  /etc/ld.so.conf.d/oracle.conf && \
+   ldconfig && source /etc/profile && pip3 install cx_Oracle && \
+   ln -s ${destination}/odat.py /usr/bin/odat.py && \
+   sed -i "s|#!/usr/bin/python|#!/usr/bin/python3|g" ${destination}/odat.py
+   odat.py -h
+   rm -rf /tmp/odat_rpm
 fi
 
