@@ -10,7 +10,7 @@ curd="$PWD"
 usage(){
 	 echo -e "${GREEN}\nUsage:${NC}"
          echo -e "\t $0  /path/to/instalation/directory 'any env paramters to use with the script'"
-         echo -e "\t $0  /path/to/instalation/directory proxy=http://127.0.0.1 "
+         echo -e "\t $0  /path/to/instalation/directory proxy=http://127.0.0.1:8080"
 }
 
 #Verify if script run as root
@@ -21,7 +21,7 @@ fi
 
 # verify the command 
 if [ ${#} -lt 1 ]; then
-   echo -e "${RED}\n[ERROR]: This script take at least one argument !!${NC}\n"
+   echo -e "${RED}\nERROR: This script take at least one argument !!${NC}\n"
     . ~/.bashrc
     usage 
     exit 1
@@ -290,7 +290,7 @@ if [ $? -ne 0 ]; then
    echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$ORACLE_HOME/lib" >> /etc/profile  && \
    echo "export PATH=\${ORACLE_HOME}bin:\$PATH" >> /etc/profile  && \
    echo "/usr/lib/oracle/${version}/client64/lib/" >  /etc/ld.so.conf.d/oracle.conf && \
-   ldconfig && source /etc/profile && pip3 install cx_Oracle && \
+   ldconfig && source /etc/profile && pip3 install cx_Oracle && pip3 install python-libnmap && \
    ln -s ${destination}/odat.py /usr/bin/odat.py && \
    sed -i "s|#!/usr/bin/python|#!/usr/bin/python3|g" ${destination}/odat.py
    odat.py -h

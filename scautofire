@@ -335,18 +335,18 @@ run_gobuster(){
   else
     extension=".html,.php"
   fi
-  gobuster  dir --useragent "roughiz" --timeout 50s -w $2 --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -x $extension -t 20 -u $1 -o "$4/recon_${5}.txt" 
+  gobuster  dir --useragent "Browser" --timeout 50s -w $2 --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -x $extension -t 20 -u $1 -o "$4/recon_${5}.txt" 
   if [ -f  $4/recon_${5}.txt ]; then
     sort $4/recon_${5}.txt | uniq > $4/recon_tmp.txt
     cat $4/recon_tmp.txt > $4/recon_${5}.txt
     rm $4/recon_tmp.txt
-    echo "\$ gobuster  dir --useragent 'roughiz' --timeout 50s -w $2 --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -x $extension -t 20 -u $1 \n\n$(cat $4/recon_${5}.txt)" > $4/recon_${5}.txt
+    echo "\$ gobuster  dir --useragent 'Browser' --timeout 50s -w $2 --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -x $extension -t 20 -u $1 \n\n$(cat $4/recon_${5}.txt)" > $4/recon_${5}.txt
   fi
   ## enumerate tomcat server using specific wordlist
   if [ "$(echo "$3" | grep -i "Tomcat")" != "" ]; then
   	echo "\n${YELLOW}[RECON Tomcat server] Running gobuster for the url: $url \n${NC}"
-    echo "\n\n\$ gobuster  dir --useragent "roughiz" --timeout 50s -w $tomcat_wordlist --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -t 20 -u $1\n" | tee -a $4/recon_${5}.txt
-    gobuster  dir --useragent "roughiz" --timeout 50s -w $tomcat_wordlist --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -t 20 -u $1 -o $4/recon_tmp.txt
+    echo "\n\n\$ gobuster  dir --useragent "Browser" --timeout 50s -w $tomcat_wordlist --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -t 20 -u $1\n" | tee -a $4/recon_${5}.txt
+    gobuster  dir --useragent "Browser" --timeout 50s -w $tomcat_wordlist --wildcard -k -l -e -s 200,204,301,302,304,307,401,405,501,500,502 -t 20 -u $1 -o $4/recon_tmp.txt
     if [ -f  $4/recon_tmp.txt ]; then
       cat $4/recon_tmp.txt >> $4/recon_${5}.txt
       # test default creds for tomcat 
@@ -931,7 +931,7 @@ usage()
      echo "\t     --rate=int               The speed of masscan, 150<value<1000                                                   (set to 150 by default)"
      echo "\t     --path=string            Path to a $0 report where the scan will be added                             <required>"
      echo "\t     --cidr=ip[:name]|cidr    ip or a cidr like 10.10.10.0/24, if name used it will be shown instead of the ip"
-     echo "\t     --router-ip=ip           The gateway of the network interface if masscan can't found "
+     echo "\t     --router-ip=ip           The gateway of the network interface if masscan can't found | in same case when mascan found no port open, try this with the same scanned IP"
      echo "\t                                      it(failed to detect router for interface)"
      echo "\t     --ips-list=string        Path to a file which contains a list of ips to scan, you can define the name to show"
      echo "\t                                      in the report instead of the ip. Using space for the separation"
@@ -956,7 +956,7 @@ usage()
      echo "\t     --path=string            Path to a directory where the $0 will create the new report                  <required>"
      echo "\t     --name=string            The name of the report without space                                                   <Required>"
      echo "\t     --cidr=ip[:name]|cidr    ip or a cidr like 10.10.10.0/24, if name used it will be shown instead of the ip"
-     echo "\t     --router-ip=ip           The gateway of the network interface if masscan can't found "
+     echo "\t     --router-ip=ip           The gateway of the network interface if masscan can't found| in same case when mascan found no port open, try this with the same scanned IP"
      echo "\t                                      it(failed to detect router for interface)"
      echo "\t     --ips-list=string        Path to a file which contains a list of ips to scan, you can define the name to show"
      echo "\t                                      in the report instead of the ip. Using space for the separation"
