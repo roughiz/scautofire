@@ -79,8 +79,36 @@ elif [ -f ~/.bashrc ]; then
    . ~/.bashrc
 fi
 
+# fct install packages
+install_aval_package() {
+for i in $1
+  do 
+     if [ -z "$(apt-cache madison $i 2>/dev/null)" ]; then
+       echo " > Package $i not available on repo."
+     else
+       echo " > Add package $i to the install list"
+     packages="$packages $i"
+     fi
+ done
+ echo "$packages" #you could comment this.
+ apt-get -y install $packages
+}
+
+# install curl
+install_aval_package "curl"
+
+# install python-pip, if dosent exist install it manually 
+if [ -z "$(apt-cache madison python-pip  2>/dev/null)" ] && [ -z "$(pip2 --version 2> /dev/null)" ] ; then
+       echo " > Package python-pip  not available on repo. Install it manually"
+       add-apt-repository universe
+       apt update 
+       apt install python2
+       curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output /tmp/get-pip.py
+       python2 /tmp/get-pip.py
+fi
+       
 # install pip, alien 
-apt install -y python-pip python3-venv python3-pip libaio1 python3-dev alien && \
+install_aval_package  "python3-venv python3-pip libaio1 python3-dev alien"
 pip install setuptools
 
 # Install some python lib
@@ -93,8 +121,23 @@ pip3 install pyinstaller
 command_exists "keepnote"
 if [ $? -ne 0 ]; then
 	echo -e "${GREEN}\nInstall keepnote${NC}"
-	apt-get install -y  python python-gtk2 python-glade2 libgtk2.0-dev libsqlite3-0 && \
-	apt-get install -y keepnote
+	curl -o /tmp/python-gtk.deb http://archive.ubuntu.com/ubuntu/pool/universe/p/pygtk/python-gtk2_2.24.0-5.1ubuntu2_amd64.deb  
+	apt-get install -y /tmp/python-gtk.deb 
+	curl -o /tmp/python-glad.deb http://archive.ubuntu.com/ubuntu/pool/universe/p/pygtk/python-glade2_2.24.0-5.1ubuntu2_amd64.deb 
+        apt-get install -y /tmp/python-glad.deb
+	apt-get install -y  libgtk2.0-dev libsqlite3-0 
+	curl -o /tmp/keepnote.deb http://archive.ubuntu.com/ubuntu/pool/universe/k/keepnote/keepnote_0.7.8-1.1_all.deb
+	apt-get install -y /tmp/keepnote.deb
+fi
+
+# Install nmap
+command_exists "nmap"
+if [ $? -ne 0 ]; then
+	echo -e "${GREEN}\nInstall nmap${NC}"
+	apt-get install -y nmap
+	execute_as_sudo_user "git clone https://github.com/vulnersCom/nmap-vulners.git ${rootDir}nmap-vulners"
+	cp ${rootDir}nmap-vulners/vulners.nse /usr/share/nmap/scripts/ && \
+	cd /usr/share/nmap/scripts/ && nmap --script-updatedb
 fi
 
 ## Install nmap scripts
@@ -107,16 +150,6 @@ if [  -d "$nmap_script" ]; then
   fi
 else
   echo -e "${RED}\n[ERROR]: the path \"$nmap_script\" is not found, find the nmap scripts emplacement !!${NC}\n"
-fi
-
-# Install nmap
-command_exists "nmap"
-if [ $? -ne 0 ]; then
-	echo -e "${GREEN}\nInstall nmap${NC}"
-	apt-get install -y nmap
-	execute_as_sudo_user "git clone https://github.com/vulnersCom/nmap-vulners.git ${rootDir}nmap-vulners"
-	cp ${rootDir}nmap-vulners/vulners.nse /usr/share/nmap/scripts/ && \
-	cd /usr/share/nmap/scripts/ && nmap --script-updatedb
 fi
 
 #Install curl
@@ -193,7 +226,6 @@ fi
 command_exists "droopescan"
 if [ $? -ne 0 ]; then
 	echo -e "${GREEN}\nInstall droopescan${NC}"
-	apt-get install -y python-pip && \
 	pip install droopescan
 fi
 

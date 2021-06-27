@@ -904,7 +904,7 @@ fi
 }
 
 verify_net_interface(){
-if [ "$(ifconfig | grep $1 | cut -d: -f 1)" != "$1" ]; then
+if [ "$(ip -br addr | grep tun0 | cut -d" " -f 1)" != "$1" ]; then
    echo "${RED}\n[ERROR]: parameter \"--interface=$1\" is not correct. Interface '$1' not found ${NC}\n" 
    exit 2
 fi   
