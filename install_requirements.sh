@@ -68,17 +68,6 @@ function main(){
 # Run the main fct
 main $*
 
-execute_as_sudo_user(){
-  cur_cmd="$1"
-  # if script runs with sudo
-  if [ "$SUDO_USER" != "" ]; then
-   	 # execute commmand as the sudo user 
-        su -c "http_proxy=$PROXY https_proxy=$PROXY $cur_cmd" $SUDO_USER
-  else
-    $cur_cmd
-  fi
-}
-
 command_exists(){
   if ! cmd="$(type -p "$1")" || [[ -z $cmd ]]; then
     return 1
