@@ -29,22 +29,9 @@ We can also create just a page for a keepNote report
 The fastest Internet port scanner. It can scan the entire Internet in under 6 minutes, transmitting 10 million packets per second.
 Combined with nmap, we can scan all (tcp/udp) port very quickly.
 
-#### Nota:
-masscan and keepnote and many other tools must be installed. See requirements file
-
-You should open report with KeepNote tool.
-
-To start the tool from anywhere you should define the location of the tool like :
-
+## Install
 ```
-sudo export KEEPSCAN="/path/to/EnumNeTKeepNoteReportCreator"
-```
-
-### Install it in global mode
-To intsall the tool in global mode, use the tool like :
-
-```
-$ sudo ./install_global.sh
+$ ./install.sh
 ```
 
 ### Tool argments Usage: 
@@ -53,19 +40,19 @@ $ sudo ./install_global.sh
 $ scautofire    
 
 Usage:
-	 scautofire  [command] [Flags]
+	 usage  [command] [Flags]
 Available Commands:
 	 new                     Create a new report scan
 	 addto                   Add a scan into a report already exists
 
 Flags:
-	 -h, --help                   help for ./scautofire
+	 -h, --help                   help for usage
 	     --type=string            l|h  ['h' for huge scan(all ports) and 'l' for light scan(for commun ports)]           (light by default)
 	     --masscan=string         on|no ['on' to enable masscan and 'no' to disable masscan]                             (enable by default)
 	     --interface=string       The network interface to use with masscan, required if masscan is enabled
 	     --rate=int               The speed of masscan, 150<value<1000                                                   (set to 150 by default)
 
-Use 'scautofire [command] --help' for more information about a command.
+Use 'usage [command] --help' for more information about a command
 ```
 
 ### Create a new report usage:
@@ -155,10 +142,4 @@ scautofire addto --masscan=no  --path=/path/to/exists/report/directory --cidr=10
 
 Create a report scan with a huge scan without Masscan :
 scautofire addto --type=h  --masscan=no  --path=/path/to/exists/report/directory --cidr=10.10.10.0/24
-``` 
-
-
-
-
-
-
+```

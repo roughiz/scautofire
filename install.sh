@@ -10,7 +10,6 @@ VENV="$PWD/.env"
 
 PROXY=""
 PIP_INSTALL="$VENV/bin/pip install --upgrade " 
-PIP3_INSTALL="$VENV/bin/pip install --upgrade "
 # Usage function
 function usage(){
     echo "Usage: ${0} -d /path/to/install/folder -p http://127.0.0.1:8080"
@@ -30,7 +29,6 @@ function usage(){
 
 # Main function
 function main(){
-    echo "<<<< $* >>>>"
     if [ -z "$*" ]; then
         usage
         exit 1
@@ -44,7 +42,6 @@ function main(){
             -d | --destination) 
                if [ -d "$VALUE" ]; then
                  if expr "$VALUE" : '/.*/$' >/dev/null || [ ${#VALUE} = 1 ]; then rootDir=$VALUE; else rootDir="$VALUE/"; fi 
-                  echo "ok"
                else
                  echo -e "${RED}\n[ERROR]: the path \"$1\" is not a directory !!${NC}\n"
                  usage
@@ -97,6 +94,7 @@ else
 fi
 
 env | grep -i proxy 
+echo -e "${GREEN}\nInstall requirements ${NC}"
 
 # Update gem
 $SUDO  gem update --system      
@@ -147,6 +145,7 @@ if [ $? -ne 0 ]; then
 	cd ${rootDir}masscan && make -j
 	cd ${rootDir}masscan
 	sudo make install
+        sudo ln -s ${rootDir}masscan/bin/masscan /usr/local/bin/masscan
 fi
 
 #Install sslyze
@@ -206,7 +205,7 @@ command_exists "smbmap"
 if [ $? -ne 0 ]; then
     echo -e "${GREEN}\nInstall smbmap${NC}"
     git clone https://github.com/ShawnDEvans/smbmap.git ${rootDir}smbmap 
-    cd ${rootDir}smbmap && $PIP3_INSTALL -r requirements.txt
+    cd ${rootDir}smbmap && $PIP_INSTALL -r requirements.txt
     sudo ln -s  ${rootDir}smbmap/smbmap.py /usr/local/bin/smbmap
 fi
 
@@ -287,10 +286,17 @@ if [ $? -ne 0 ]; then
        sudo echo "export PATH=\${ORACLE_HOME}bin:\$PATH" >> /etc/profile  
    fi
    echo "/usr/lib/oracle/${version}/client64/lib/"  | sudo tee /etc/ld.so.conf.d/oracle.conf && \
-   sudo ldconfig && source /etc/profile && $PIP3_INSTALL cx_Oracle && $PIP3_INSTALL python-libnmap && \
+   sudo ldconfig && source /etc/profile && $PIP_INSTALL cx_Oracle && $PIP_INSTALL python-libnmap && \
    sudo ln -s ${destination}/odat.py /usr/local/bin/odat.py && \
    sudo sed -i "s|#!/usr/bin/python|#!/usr/bin/env python3|g" ${destination}/odat.py
-   #odat.py -h
    rm -rf /tmp/odat_rpm
 fi
 
+## Install scautofire 
+echo -e "${GREEN}\nInstall scautofire ${NC}"
+cd "$curd"
+sudo rm -rf /usr/bin/scautofire
+sudo cp ./scautofire /usr/bin/
+
+sudo rm -rf /usr/share/KeepScan
+sudo ln -s $curd /usr/share/KeepScan
