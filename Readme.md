@@ -31,7 +31,7 @@ Combined with nmap, we can scan all (tcp/udp) port very quickly.
 
 ## Install
 ```
-$ ./install.sh
+$ ./install.sh -d /home/user/installer
 ```
 
 ### Tool argments Usage: 
