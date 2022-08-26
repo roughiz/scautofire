@@ -93,7 +93,6 @@ else
   SUDO="sudo "
 fi
 
-env | grep -i proxy 
 echo -e "${GREEN}\nInstall requirements ${NC}"
 
 # Update gem
@@ -173,6 +172,17 @@ command_exists "wpscan"
 if [ $? -ne 0 ]; then
 	echo -e "${GREEN}\nInstall wpscan${NC}"
 	$SUDO gem install  wpscan
+fi
+
+# Install snmp-check
+command_exists "snmp-check"
+if [ $? -ne 0 ]; then
+        echo -e "${GREEN}\nInstall snmp-check${NC}"
+        #Install snmp package
+        $SUDO gem install snmp
+        git clone https://gitlab.com/kalilinux/packages/snmpcheck.git ${rootDir}snmp-check
+        chmod +x ${rootDir}snmp-check/snmpcheck-1.9.rb
+        sudo ln -s ${rootDir}snmp-check/snmpcheck-1.9.rb /usr/local/bin/snmp-check
 fi
 
 #Install droopescan
